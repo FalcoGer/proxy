@@ -1,10 +1,3 @@
-# adopted from: https://github.com/LiveOverflow/PwnAdventure3/blob/master/tools/proxy/proxy_part14.py
-# changes:
-#   argparse for more flexibility
-#   non blocking sockets
-#   allow parser to drop packets
-#   every packet goes through the queue now
-
 import socket
 import os
 import sys
@@ -48,7 +41,7 @@ class Remote2Proxy(Thread):
                     print('[EXCEPT] - server[{}]: {}'.format(self.port, e))
 
             # send any data in the queue to the client
-            if len(parser.CLIENT_QUEUE) > 0:
+            while len(parser.CLIENT_QUEUE) > 0:
                 pkt = parser.CLIENT_QUEUE.pop()
                 # print(f"Sending {pkt} to the client")
                 self.client.sendall(pkt)
@@ -91,7 +84,7 @@ class Client2Proxy(Thread):
                     print('[EXCEPT] - client[{}]: {}'.format(self.port, e))
 
             # send any data which may be in the queue to the server
-            if len(parser.SERVER_QUEUE) > 0:
+            while len(parser.SERVER_QUEUE) > 0:
                 pkt = parser.SERVER_QUEUE.pop()
                 # print(f"Sending {pkt} to the server")
                 self.server.sendall(pkt)
