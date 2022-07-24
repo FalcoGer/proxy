@@ -1,3 +1,10 @@
+# adopted from: https://github.com/LiveOverflow/PwnAdventure3/blob/master/tools/proxy/proxy_part14.py
+# changes:
+#   argparse for more flexibility
+#   non blocking sockets
+#   allow parser to drop packets
+#   every packet goes through the queue now
+
 import socket
 import os
 import sys
