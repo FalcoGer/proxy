@@ -11,4 +11,6 @@ I have adopted the following changes:
 - Stripped any specific code for the CTF
 - Argparse for more flexibility
 - Using non blocking sockets to allow for injections via command
-- Every packet now goes through the query arrays, this allows the parser to drop packets it doesn't want or inject multiple at once
+- Every packet now goes through the queues, this allows the parser to drop packets it doesn't want or inject multiple at once
+- Using thread safe queues
+
