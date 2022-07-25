@@ -40,9 +40,10 @@ class Remote2Proxy(Thread):
                 except Exception as e:
                     print('[EXCEPT] - server[{}]: {}'.format(self.port, e))
 
-            # send any data in the queue to the client
-            while len(parser.CLIENT_QUEUE) > 0:
-                pkt = parser.CLIENT_QUEUE.pop()
+            # send any data which may be in the queue to the client
+            # this only works because this thread is the only consumer for the queue
+            while not parser.CLIENT_QUEUE.empty():
+                pkt = parser.CLIENT_QUEUE.get()
                 # print(f"Sending {pkt} to the client")
                 self.client.sendall(pkt)
 
@@ -84,8 +85,9 @@ class Client2Proxy(Thread):
                     print('[EXCEPT] - client[{}]: {}'.format(self.port, e))
 
             # send any data which may be in the queue to the server
-            while len(parser.SERVER_QUEUE) > 0:
-                pkt = parser.SERVER_QUEUE.pop()
+            # this only works because this thread is the only consumer for the queue
+            while not parser.SERVER_QUEUE.empty():
+                pkt = parser.SERVER_QUEUE.get()
                 # print(f"Sending {pkt} to the server")
                 self.server.sendall(pkt)
 
@@ -140,12 +142,12 @@ def main():
                 # send to server
                 pkt = bytes.fromhex(cmd[2:])
                 if proxy.running:
-                    parser.SERVER_QUEUE.append(pkt)
+                    parser.SERVER_QUEUE.put(pkt)
             elif cmd[0:2] == 'C ':
                 # send to client
                 pkt = bytes.fromhex(cmd[2:])
                 if proxy.running:
-                    parser.CLIENT_QUEUE.append(pkt)
+                    parser.CLIENT_QUEUE.put(pkt)
             # more commands here
             elif len(cmd.strip()) == 0:
                 pass

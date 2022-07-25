@@ -1,5 +1,10 @@
-SERVER_QUEUE = []
-CLIENT_QUEUE = []
+# struct is used to decode bytes into primitive data types
+import struct
+# queue is used as a thread safe data structure for packets to be sent to the client or server
+import queue
+
+SERVER_QUEUE = queue.SimpleQueue()
+CLIENT_QUEUE = queue.SimpleQueue()
 
 def parse(data, port, origin):
     sign = '->' if origin == 'client' else '<-'
@@ -10,7 +15,7 @@ def parse(data, port, origin):
         print("Dropped")
         return
     if (origin == 'client'):
-        SERVER_QUEUE.append(data)
+        SERVER_QUEUE.put(data)
     elif (origin == 'server'):
-        CLIENT_QUEUE.append(data)
+        CLIENT_QUEUE.put(data)
 
