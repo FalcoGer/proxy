@@ -139,16 +139,16 @@ def main():
             if cmd == 'quit' or cmd == 'exit':
                 os._exit(0)
             elif cmd[0:2] == 'S ':
-                # send to server
+                # Send to server.
                 pkt = bytes.fromhex(cmd[2:])
                 if proxy.running:
                     parser.SERVER_QUEUE.put(pkt)
             elif cmd[0:2] == 'C ':
-                # send to client
+                # Send to client.
                 pkt = bytes.fromhex(cmd[2:])
                 if proxy.running:
                     parser.CLIENT_QUEUE.put(pkt)
-            # more commands here
+            # More commands go here.
             elif len(cmd.strip()) == 0:
                 pass
             else:
