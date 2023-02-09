@@ -16,7 +16,7 @@ class Remote2Proxy(Thread):
 
     def __init__(self, host, port):
         super(Remote2Proxy, self).__init__()
-        self.client = None # game client socket not known yet
+        self.client = None # Client socket not known yet
         self.port = port
         self.host = host
         print(f"Connecting to {host}:{port}")
@@ -24,38 +24,37 @@ class Remote2Proxy(Thread):
         self.server.connect((host, port))
         self.server.setblocking(False)
 
-    # run in thread
+    # Run in thread
     def run(self):
         while True:
-            # receive data from the server
+            # Receive data from the server.
             data = False
             try:
                 data = self.server.recv(4096)
             except BlockingIOError as e:
-                # no data was available at the time
+                # Pass if no data is available.
                 pass
             if data:
                 try:
-                    # parse the data from the parser
-                    # if the parser wants to send the data, it will append it to the queue, potentially modified
+                    # Parse the data from the parser.
+                    # If the parser wants to send the data, it will append it to the queue, potentially modified.
                     parser.parse(data, self.port, 'server')
                 except Exception as e:
                     print('[EXCEPT] - server[{}]: {}'.format(self.port, e))
 
-            # send any data which may be in the queue to the client
-            # this only works because this thread is the only consumer for the queue
+            # Send any data which may be in the queue to the client.
             while not parser.CLIENT_QUEUE.empty():
                 pkt = parser.CLIENT_QUEUE.get()
                 # print(f"Sending {pkt} to the client")
                 self.client.sendall(pkt)
 
-# this thread binds a listening port and awaits a connection.
-# any traffic sent to it will be parsed by the parser and then sent onto the server.
+# This thread binds a listening port and awaits a connection.
+# Any traffic sent to it will be parsed by the parser and then sent onto the server.
 class Client2Proxy(Thread):
 
     def __init__(self, host, port):
         super(Client2Proxy, self).__init__()
-        self.server = None # real server socket not known yet
+        self.server = None # Server socket not known yet
         self.port = port
         self.host = host
         print(f"Starting listening socket on {host}:{port}")
@@ -69,25 +68,25 @@ class Client2Proxy(Thread):
 
     def run(self):
         while True:
-            # fetch data from the client
+            # Fetch data from the client.
             data = False
             try:
                 data = self.client.recv(4096)
             except BlockingIOError as e:
-                # no data was available at the time
+                # Pass if no data is available.
                 pass
 
-            # if we got data, parse it.
+            # If we recieve data, parse it.
             if data:
                 try:
-                    # parse the data. the parser may enqueue any data it wants to send on to the server.
-                    # the parser adds any packages it actually wants to forward for the server to the queue.
+                    # Parse the data. The parser may enqueue any data it wants to send on to the server.
+                    # The parser adds any packages it actually wants to forward for the server to the queue.
                     parser.parse(data, self.port, 'client')
                 except Exception as e:
                     print('[EXCEPT] - client[{}]: {}'.format(self.port, e))
 
-            # send any data which may be in the queue to the server
-            # this only works because this thread is the only consumer for the queue
+            # Send any data which may be in the queue to the server.
+            # This only works because this thread is the only consumer for the queue.
             while not parser.SERVER_QUEUE.empty():
                 pkt = parser.SERVER_QUEUE.get()
                 # print(f"Sending {pkt} to the server")
@@ -105,7 +104,7 @@ class Proxy(Thread):
         self.identifier = "{}:{} -> {}:{}".format(self.bind, self.localport, self.remote, self.remoteport)
 
     def run(self):
-        # after client disconnected await a new client connection
+        # After client disconnect, await a new client connection.
         while True:
             print(f"[proxy({self.identifier})] setting up")
             self.c2p = Client2Proxy(self.bind, self.localport) # waiting for a client
@@ -119,9 +118,8 @@ class Proxy(Thread):
             self.c2p.start()
             self.s2p.start()
 
-
 def main():
-    # parse command line arguments
+    # Parse command line arguments.
     arg_parser = argparse.ArgumentParser(description='Create a proxy connection')
     arg_parser.add_argument('-b', '--bind', required=False, help='Bind address for the listening socket. Default \'0.0.0.0\'', default='0.0.0.0')
     arg_parser.add_argument('-r', '--remote', required=True, help='Remote host connect to')
@@ -130,11 +128,11 @@ def main():
 
     args = arg_parser.parse_args()
 
-    # create a proxy with, binding on all interfaces
+    # Create a proxy with binding on all interfaces.
     proxy = Proxy(args.bind, args.remote, args.localport, args.remoteport)
     proxy.start()
 
-    # accept user input and parse it
+    # Accept user input and parse it.
     while True:
         try:
             cmd = input('$ ')
