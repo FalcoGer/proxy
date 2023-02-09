@@ -54,7 +54,7 @@ class Client2Proxy(Thread):
 
     def __init__(self, host, port):
         super(Client2Proxy, self).__init__()
-        self.server = None # Server socket not known yet
+        self.server = None # Server socket not known yet.
         self.port = port
         self.host = host
         print(f"Starting listening socket on {host}:{port}")
@@ -62,7 +62,7 @@ class Client2Proxy(Thread):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind((host, port))
         sock.listen(1)
-        # waiting for a connection
+        # Waiting for a connection.
         self.client, addr = sock.accept()
         self.client.setblocking(False)
 
