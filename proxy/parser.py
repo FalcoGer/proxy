@@ -9,6 +9,7 @@ CLIENT_QUEUE = queue.SimpleQueue()
 def parse(data, port, origin):
     sign = '->' if origin == 'client' else '<-'
     print(f"c{sign}s: {data}")
+    # Use structure below to drop packets if they contain certain data.
     #if data.find(b'insert packet here') >= 0:
     #   print("Dropped")
     #   return
