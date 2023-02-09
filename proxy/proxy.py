@@ -8,6 +8,7 @@ import random
 import struct
 from importlib import reload
 import argparse
+import codecs
 
 # This thread class connects to a remote host.
 # Any data received from that host is put through the parser.
