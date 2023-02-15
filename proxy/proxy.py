@@ -107,10 +107,10 @@ class Proxy(Thread):
         # After client disconnect, await a new client connection.
         while True:
             print(f"[proxy({self.identifier})] setting up")
-            self.c2p = Client2Proxy(self.bind, self.localport) # waiting for a client
+            self.c2p = Client2Proxy(self.bind, self.localport) # Waiting for a client
             self.s2p = Remote2Proxy(self.remote, self.remoteport)
             print(f"[proxy({self.identifier})] connection established")
-            # set up reference to each other
+            # Set up reference to each other
             self.c2p.server = self.s2p.server
             self.s2p.client = self.c2p.client
             self.running = True
@@ -131,7 +131,17 @@ def main():
     # Create a proxy with binding on all interfaces.
     proxy = Proxy(args.bind, args.remote, args.localport, args.remoteport)
     proxy.start()
-
+    
+    # PwnAdventure3 Proxies
+    #master_server = Proxy('0.0.0.0', '52.188.13.252', 3333)
+    #master_server.start()
+    # game_servers = []
+    # for port in range(3000, 3010):
+    #    _game_server = Proxy('0.0.0.0', '52.188.14.251', port)
+    #    _game_server.start()
+    #    game_servers.put(_game_server)
+        
+    
     # Accept user input and parse it.
     while True:
         try:
