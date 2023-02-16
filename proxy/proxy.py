@@ -16,7 +16,7 @@ class Remote2Proxy(Thread):
 
     def __init__(self, host, port):
         super(Remote2Proxy, self).__init__()
-        self.client = None # Client socket not known yet
+        self.client = None # Client socket not known yet.
         self.port = port
         self.host = host
         print(f"Connecting to {host}:{port}")
@@ -122,9 +122,9 @@ def main():
     # Parse command line arguments.
     arg_parser = argparse.ArgumentParser(description='Create a proxy connection')
     arg_parser.add_argument('-b', '--bind', required=False, help='Bind address for the listening socket. Default \'0.0.0.0\'', default='0.0.0.0')
-    arg_parser.add_argument('-r', '--remote', required=True, help='Remote host connect to')
-    arg_parser.add_argument('-l', '--localport', type=int, required=True, help='Local port to bind to')
-    arg_parser.add_argument('-p', '--remoteport', type=int, required=True, help='Remote port to connect to')
+    arg_parser.add_argument('-r', '--remote', required=True, help='Remote host IP address to connect to')
+    arg_parser.add_argument('-l', '--localport', type=int, required=True, help='Local port # to bind to.')
+    arg_parser.add_argument('-p', '--remoteport', type=int, required=True, help='Remote port # to connect to.')
 
     args = arg_parser.parse_args()
 
