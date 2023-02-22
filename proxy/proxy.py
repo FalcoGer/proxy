@@ -136,7 +136,7 @@ def main():
     #master_server = Proxy('0.0.0.0', '52.188.13.252', 3333)
     #master_server.start()
     # game_servers = []
-    # for port in range(3000, 3010):
+    # for port in range(3000, 3024):
     #    _game_server = Proxy('0.0.0.0', '52.188.14.251', port)
     #    _game_server.start()
     #    game_servers.put(_game_server)
