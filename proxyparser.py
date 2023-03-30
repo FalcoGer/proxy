@@ -4,6 +4,7 @@
 import struct
 from socket import socket
 from proxy import Proxy
+from hexdump import hexdump
 
 def parse(data: bytes, src: (str, int), dest: (str, int), origin: str, proxy: Proxy) -> None:
     sh, sp = src
@@ -14,8 +15,10 @@ def parse(data: bytes, src: (str, int), dest: (str, int), origin: str, proxy: Pr
 
     srcStr = srcStr.rjust(maxLen)
     destStr = destStr.ljust(maxLen)
-
-    print(f"{srcStr}->{destStr} : {data}")
+    hd = ""
+    for line in hexdump(data):
+        hd += line + '\n'
+    print(f"{srcStr}->{destStr} ({len(data)} Bytes)\n{hd}")
 
     # Do interesting stuff with the data here!
     if data == b'ABCD\n' and origin == 'c':
