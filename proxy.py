@@ -59,8 +59,10 @@ class Proxy(Thread):
             print(f"[proxy({self.identifier})] connection established.")
 
             # Start client and server socket handler threads.
-            self.client.start()
-            self.server.start()
+            if self.client is not None:
+                self.client.start()
+            if self.server is not None:
+                self.server.start()
             
             self.running = True
         return
@@ -131,6 +133,7 @@ class Proxy(Thread):
             print('[proxy({})] Unable to connect to server {}:{}. {}'.format(self.identifier, self.remoteAddr, self.remotePort, e))
             if self.client is not None:
                 self.client.stop()
+                self.client = None
 
         return
 
@@ -198,7 +201,6 @@ class SocketHandler(Thread):
             abort = False
 
             readyToRead, readyToWrite, inError = self.checkAlive()
-            print(f"{self.role} - RTS: {readyToWrite}, RTR: {readyToRead}, ERR: {inError}")
             
             # Check if stop has been called by checkAlive (or anyone else)
             if not self.running:
@@ -207,6 +209,8 @@ class SocketHandler(Thread):
             if readyToRead:
                 try:
                     data = self.sock.recv(4096)
+                    if len(data) == 0:
+                        raise IOError("Socket disconnected")
                 except BlockingIOError as e:
                     # No data was available at the time.
                     pass
