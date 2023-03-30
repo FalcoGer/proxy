@@ -7,6 +7,7 @@ from proxy import Proxy
 from hexdump import hexdump
 
 def parse(data: bytes, src: (str, int), dest: (str, int), origin: str, proxy: Proxy) -> None:
+    # Print out the data in a nice format.
     sh, sp = src
     dh, dp = dest
     srcStr = f"{sh}:{sp}"
@@ -15,14 +16,13 @@ def parse(data: bytes, src: (str, int), dest: (str, int), origin: str, proxy: Pr
 
     srcStr = srcStr.rjust(maxLen)
     destStr = destStr.ljust(maxLen)
-    hd = ""
-    for line in hexdump(data):
-        hd += line + '\n'
+    hd = "\n".join(hexdump(data, 24, 8))
+
     print(f"{srcStr}->{destStr} ({len(data)} Bytes)\n{hd}")
 
     # Do interesting stuff with the data here!
-    if data == b'ABCD\n' and origin == 'c':
-        data = b'DCBA\n'
+    #if data == b'ABCD\n' and origin == 'c':
+    #    data = b'DCBA\n'
 
     # A construct like this may be used to drop packets. 
     #if data.find(b'\xFF\xFF\xFF\xFF') >= 0:

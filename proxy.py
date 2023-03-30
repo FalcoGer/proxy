@@ -240,7 +240,7 @@ class SocketHandler(Thread):
             # Send the queue
             queueEmpty = self.dataQueue.empty()
             readyToRead, readyToWrite, inError = self.checkAlive()
-            abort2 == False
+            abort2 = False
             if not queueEmpty and readyToWrite:
                 abort2 = self.sendQueue()
             
