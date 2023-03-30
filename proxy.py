@@ -6,45 +6,37 @@ import argparse
 
 # For networking
 import socket
+import select
 
 # Thread safe data structure to hold messages we want to send
 from queue import SimpleQueue
 
 # For creating multiple threads
 from threading import Thread
-#from threading import Lock
 from time import sleep
 
 # This allows us to reload a python file
 from importlib import reload
 
 # This is where users may do live edits and alter the behavior of the proxy.
-import parser as parser
+import proxyparser as parser
 
 class Proxy(Thread):
     def __init__(self, bindAddr: str, remoteAddr: str, localPort: int, remotePort: int):
-        super(Proxy, self).__init__()
-        
+        super().__init__()
+ 
         self.running = False
-        self.identifier = "{}:{} -> {}:{}".format(bindAddr, localPort, remoteAddr, remotePort)
+        self.identifier = f"{bindAddr}:{localPort} -> {remoteAddr}:{remotePort}"
 
         self.bindAddr = bindAddr
         self.remoteAddr = remoteAddr
         self.localPort = localPort
         self.remotePort = remotePort
         
-        # Sending threads
-        self.dataSenderClient = None
-        self.dataSenderServer = None
-
-        # Receiving threads
-        self.dataReceiverClient = None
-        self.dataReceiverServer = None
-        
         # Sockets
         self.bindSocket = None
-        self.clientSocket = None
-        self.remoteSocket = None
+        self.server = None
+        self.client = None
 
         self.bind(self.bindAddr, self.localPort)
         return
@@ -59,31 +51,25 @@ class Proxy(Thread):
             
             # Client has connected.
             ch, cp = self.getClient()
-            self.identifier = "{}:{} -> {}:{}".format(ch, cp, self.remoteAddr, self.remotePort)
+            self.identifier = f"{ch}:{cp} -> {self.remoteAddr}:{self.remotePort}"
             print(f"[proxy({self.identifier})] client connected. Connecting to remote host.")
             
             # Connect to the remote host after a client has connected.
             self.connect()
             print(f"[proxy({self.identifier})] connection established.")
 
-            # Set up and start the data receiver threads.
-            self.dataReceiverClient = DataReceiver(self.clientSocket, self.remoteSocket, 'c', self)
-            self.dataReceiverServer = DataReceiver(self.remoteSocket, self.clientSocket, 's', self)
-            self.dataReceiverClient.start()
-            self.dataReceiverServer.start()
-            
-            # Set up and start the data sender threads.
-            self.dataSenderClient = DataSender(self.clientSocket, self)
-            self.dataSenderServer = DataSender(self.remoteSocket, self)
-            self.dataSenderClient.start()
-            self.dataSenderServer.start()
+            # Start client and server socket handler threads.
+            self.client.start()
+            self.server.start()
             
             self.running = True
         return
 
     def sendData(self, destination: str, data: bytes) -> None:
-        ds = self.dataSenderClient if destination == 'c' else self.dataSenderServer
-        ds.send(data)
+        sh = self.client if destination == 'c' else self.server
+        if sh is None:
+            return
+        sh.send(data)
         return
     
     def sendToServer(self, data: bytes) -> None:
@@ -95,10 +81,16 @@ class Proxy(Thread):
         return
 
     def getClient(self) -> (str, int):
-        return self.clientSocket.getpeername()
+        ret = (None, None)
+        if self.client is not None:
+            ret = (self.client.host, self.client.port)
+        return ret
 
     def getServer(self) -> (str, int):
-        return self.remoteSocket.getpeername()
+        ret = (None, None)
+        if self.server is not None:
+            ret = (self.server.host, self.server.port)
+        return ret
     
     def bind(self, host: str, port: int) -> None:
         print(f"[proxy({self.identifier})] Starting listening socket on {host}:{port}")
@@ -108,168 +100,172 @@ class Proxy(Thread):
         self.bindSocket.listen(1)
 
     def waitForClient(self) -> None:
-        oldClientSocket = self.clientSocket
-        # Lock until new connection is established
-        self.clientSocket, addr = self.bindSocket.accept()
-
-        # Set socket non-blocking. recv() will return if there is no data available.
-        #self.clientSocket.setblocking(0)
-
-        if oldClientSocket != None:
-            # There is a client already, disconnect them.
-            oldClientSocket.close()
-            # Also disconnect from the server
-            self.disconnectServer()
+        oldClient = self.client
+        sock, addr = self.bindSocket.accept()
+        self.client = SocketHandler(sock, (self.remoteAddr, self.remotePort), 'c', self)
+        
+        # Disconnect the old client if there was one.
+        if oldClient is not None:
+            oldClient.stop()
+            oldClient.join()
+            oldClient = None
+            # Also disconnect from the server for a brand new connection.
+            if self.server is not None:
+                self.server.stop()
+                self.server.join()
+                self.server = None
 
         return
     
     def connect(self) -> None:
         print(f"[proxy({self.identifier})] Connecting to {self.remoteAddr}:{self.remotePort}")
-        if self.remoteSocket != None:
+        if self.server is not None:
             print(f"[proxy({self.identifier})] Already connected to remote host.")
             return
 
-        self.resetDataSenderServerAndDataReceiverServer()
-        
         try:
-            self.remoteSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.remoteSocket.connect((self.remoteAddr, self.remotePort))
-            # Set socket non-blocking. recv() will return if there is no data available.
-            #self.remoteSocket.setblocking(0)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect((self.remoteAddr, self.remotePort))
+            self.server = SocketHandler(sock, self.getClient(), 's', self)
         except Exception as e:
-            print('[proxy({})] Unable to connect to server {}:{}.'.format(self.identifier, self.remoteAddr, self.remotePort))
-            self.disconnectClient()
+            print('[proxy({})] Unable to connect to server {}:{}. {}'.format(self.identifier, self.remoteAddr, self.remotePort, e))
+            if self.client is not None:
+                self.client.stop()
 
         return
 
-    def disconnectServer(self) -> None:
-        self.resetDataSenderServerAndDataReceiverServer()
-        if self.remoteSocket == None:
-            return
-
-        self.remoteSocket.close()
-        self.remoteSocket = None
-        return
-
-    def disconnectClient(self) -> None:
-        self.resetDataSenderClientAndDataReceiverClient()
-        if self.clientSocket == None:
-            return
+    def disconnect(self) -> None:
+        if self.client is not None:
+            self.client.stop()
+            self.client = None
         
-        self.clientSocket.close()
-        self.clientSocket = None
-        return
-
-    def resetDataSenderServerAndDataReceiverServer(self) -> None:
-        # Reset data senders and receivers.
-        if self.dataSenderServer != None:
-            self.dataSenderServer.stop()
-            self.dataSenderServer.join()
-            self.dataSenderServer = None
-        
-        if self.dataReceiverServer != None:
-            self.dataReceiverServer.stop()
-            self.dataReceiverServer.join()
-            self.dataReceiverServer = None
+        if self.server is not None:
+            self.server.stop()
+            self.server = None
         
         return
 
-    def resetDataSenderClientAndDataReceiverClient(self) -> None:
-        # Reset data senders and receivers.
-        if self.dataSenderClient != None:
-            self.dataSenderClient.stop()
-            self.dataSenderClient.join()
-            self.dataSenderClient = None
+###############################################################################
+
+# This class owns a socket, receives all it's data and accepts data into a queue to be sent to that socket.
+class SocketHandler(Thread):
+    def __init__(self, sock: socket.socket, other: (str, int), role: str, proxy: Proxy):
+        super().__init__()
         
-        if self.dataReceiverClient != None:
-            self.dataReceiverClient.stop()
-            self.dataReceiverClient.join()
-            self.dataReceiverClient = None
-
-        return
-
-##############################################################################################
-
-# Any traffic sent to this thread will be parsed by the parser.
-class DataReceiver(Thread):
-    def __init__(self, srcSock: socket.socket, destSock: socket.socket, origin: str, proxy: Proxy):
-        super(DataReceiver, self).__init__()
-        self.srcSock = srcSock
-        self.destSock = destSock
-        self.proxy = proxy
-        self.origin = origin
+        self.sock = sock   # The socket
+        self.other = other # The other socket host and port for output in the parser
+        self.role = role   # Either 'c' or 's'
+        self.proxy = proxy # To pass to the parser
+        
+        # Get this once, so there is no need to check for validity of the socket later.
+        self.host, self.port = sock.getpeername()
+        
+        # Simple, thread-safe data structure for our messages to the socket to be queued into.
+        self.dataQueue = SimpleQueue()
+        
         self.running = False
+
+        # Set socket non-blocking. recv() will return if there is no data available.
+        sock.setblocking(True)
+    
+    def send(self, data: bytes) -> None:
+        self.dataQueue.put(data)
+        return
+
+    def getHost(self) -> str:
+        return self.host
+
+    def getPort(self) -> int:
+        return self.port
+
+    def stop(self) -> None:
+        # Cleanup of the socket is in the thread itself, in the run() function, to avoid the need for locks.
+        self.running = False
+        return
+
+    def checkAlive(self) -> (bool, bool, bool):
+        try:
+            readyToRead, readyToWrite, inError = select.select([self.sock,], [self.sock,], [], 3)
+        except select.error as e:
+            self.stop()
+        return (len(readyToRead) > 0, len(readyToWrite) > 0, inError)
 
     def run(self) -> None:
         self.running = True
         while self.running:
-            # Fetch data from the client.
+            # Receive data from the host.
             data = False
-            host = None
-            port = None
-            try:
-                host, port = self.srcSock.getpeername()
-                data = self.srcSock.recv(4096)
-            except BlockingIOError as e:
-                # No data was available at the time.
-                pass
-            except Exception as e:
-                print('[EXCEPT] - recv {} data [{}:{}]: {}'.format(self.origin, host, port, e))
-                self.proxy.disconnectClient()
-                self.stop()
+            abort = False
 
+            readyToRead, readyToWrite, inError = self.checkAlive()
+            print(f"{self.role} - RTS: {readyToWrite}, RTR: {readyToRead}, ERR: {inError}")
+            
+            # Check if stop has been called by checkAlive (or anyone else)
+            if not self.running:
+                continue
+
+            if readyToRead:
+                try:
+                    data = self.sock.recv(4096)
+                except BlockingIOError as e:
+                    # No data was available at the time.
+                    pass
+                except Exception as e:
+                    print('[EXCEPT] - recv data from {} [{}:{}]: {}'.format(self.role, self.host, self.port, e))
+                    self.proxy.disconnect()
+                    continue
+            
             # If we got data, parse it.
             if data:
                 try:
                     # Parse the data. The parser may enqueue any data it wants to send on to the server.
                     # The parser adds any packages it actually wants to forward for the server to the queue.
-                    parser.parse(data, self.srcSock, self.destSock, self.origin, self.proxy)
+                    parser.parse(data, (self.host, self.port), self.other, self.role, self.proxy)
                 except Exception as e:
-                    print('[EXCEPT] - recv {} data [{}:{}]: {}'.format(self.origin, host, port, e))
+                    print('[EXCEPT] - parse data from {} [{}:{}]: {}'.format(self.role, self.host, self.port, e))
                     self.stop()
-        return
+            
+            # Send the queue
+            readyToRead, readyToWrite, inError = self.checkAlive()
+            if not self.running:
+                continue
+            
+            queueEmpty = self.dataQueue.empty()
+            if readyToWrite:
+                try:
+                    # Send any data which may be in the queue
+                    while not self.dataQueue.empty():
+                        message = self.dataQueue.get()
+                        print(f"Sending {message} to {self.role}")
+                        self.sock.sendall(message)
+                except Exception as e:
+                    print('[EXCEPT] - xmit data to {} [{}:{}]: {}'.format(self.role, self.host, self.port, e))
+                    abort = True
+            
+            if abort:
+                self.proxy.disconnect()
+                continue
 
-    def stop(self) -> None:
-        self.running = False
-        return
-
-##############################################################################################
-
-# This thread will send data to the client and server from thread safe queues.
-# Anything may attach messages to either queue.
-class DataSender(Thread):
-    def __init__(self, socket: socket.socket, proxy: Proxy):
-        super(DataSender, self).__init__()
-        self.dataQueue = SimpleQueue()
-        self.socket = socket
-        self.running = False
-        self.proxy = proxy
-
-    def send(self, data: bytes) -> None:
-        self.dataQueue.put(data)
-
-    def run(self) -> None:
-        self.running = True
-        while self.running:
-            host = None
-            port = None
-            try:
-                host, port = self.socket.getpeername()
-                # Send any data which may be in the queue
-                while not self.dataQueue.empty():
-                    data = self.dataQueue.get()
-                    # print(f"Sending {data} to the client")
-                    self.socket.sendall(data)
-                # Stop the CPU from melting.
+            # Prevent the CPU from Melting
+            # Sleep if we didn't get any data or if we didn't send
+            if not data and (queueEmpty or not readyToWrite):
                 sleep(0.001)
-            except Exception as e:
-                print('[EXCEPT] - xmit data [{}:{}]: {}'.format(host, port, e))
-                self.proxy.disconnectClient()
-                self.stop()
+        
+        # Stopped, clean up socket.
+        if self.sock is None:
+            return
+        try:
+            self.sock.shutdown(2) # 0: done recv, 1: done xmit, 2: both
+        except Exception as e:
+            pass
+        try:
+            self.sock.close()
+        except Exception as e:
+            pass
+        self.sock = None
         return
 
-    def stop(self) -> None:
-        self.running = False
+###############################################################################
 
 def main():
     # parse command line arguments.

@@ -5,9 +5,9 @@ import struct
 from socket import socket
 from proxy import Proxy
 
-def parse(data: bytes, src: socket, dest: socket, origin: str, proxy: Proxy) -> None:
-    sh, sp = src.getpeername()
-    dh, dp = dest.getpeername()
+def parse(data: bytes, src: (str, int), dest: (str, int), origin: str, proxy: Proxy) -> None:
+    sh, sp = src
+    dh, dp = dest
     srcStr = f"{sh}:{sp}"
     destStr = f"{dh}:{dp}"
     maxLen = len(srcStr) if len(srcStr) > len(destStr) else len(destStr)
@@ -34,16 +34,32 @@ def handleUserInput(cmd: str, proxy: Proxy) -> bool:
         return False
     
     # Send arbitrary bytes to the server.
-    if cmd[0:2].upper() == 'S ':
-        pkt = bytes.fromhex(cmd[2:])
+    if cmd[0:3].upper() == 'SH ':
+        pkt = bytes.fromhex(cmd[3:])
         if proxy.running:
             proxy.sendToServer(pkt)
     
     # Send arbitrary bytes to the client.
-    elif cmd[0:2].upper() == 'C ':
-        pkt = bytes.fromhex(cmd[2:])
+    elif cmd[0:3].upper() == 'CH ':
+        pkt = bytes.fromhex(cmd[3:])
         if proxy.running:
             proxy.sendToClient(pkt)
+
+    elif cmd[0:3].upper() == 'SS ':
+        pktStr = cmd[3:]
+        pkt = pktStr.encode('utf-8')
+        if proxy.running:
+            proxy.sendToServer(pkt)
+
+    elif cmd[0:3].upper() == 'CS ':
+        pktStr = cmd[3:]
+        pkt = pktStr.encode('utf-8')
+        if proxy.running:
+            proxy.sendToClient(pkt)
+
+    elif cmd.upper() == "DISCONNECT":
+        if proxy.running:
+            proxy.disconnect()
 
     # More commands go here.
     elif cmd.upper() == 'EXAMPLE':
