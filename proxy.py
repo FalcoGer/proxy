@@ -193,6 +193,19 @@ class SocketHandler(Thread):
             self.stop()
         return (len(readyToRead) > 0, len(readyToWrite) > 0, inError)
 
+    def sendQueue(self) -> bool:
+        abort = False
+        try:
+            # Send any data which may be in the queue
+            while not self.dataQueue.empty():
+                message = self.dataQueue.get()
+                #print(f">>> Sending {len(message)} Bytes to {self.role}")
+                self.sock.sendall(message)
+        except Exception as e:
+            print('[EXCEPT] - xmit data to {} [{}:{}]: {}'.format(self.role, self.host, self.port, e))
+            abort = True
+        return abort
+
     def run(self) -> None:
         self.running = True
         while self.running:
@@ -201,23 +214,18 @@ class SocketHandler(Thread):
             abort = False
 
             readyToRead, readyToWrite, inError = self.checkAlive()
-            
-            # Check if stop has been called by checkAlive (or anyone else)
-            if not self.running:
-                continue
 
             if readyToRead:
                 try:
                     data = self.sock.recv(4096)
                     if len(data) == 0:
-                        raise IOError("Socket disconnected")
+                        raise IOError("Socket Disconnected")
                 except BlockingIOError as e:
                     # No data was available at the time.
                     pass
                 except Exception as e:
                     print('[EXCEPT] - recv data from {} [{}:{}]: {}'.format(self.role, self.host, self.port, e))
-                    self.proxy.disconnect()
-                    continue
+                    abort = True
             
             # If we got data, parse it.
             if data:
@@ -230,25 +238,13 @@ class SocketHandler(Thread):
                     self.stop()
             
             # Send the queue
-            readyToRead, readyToWrite, inError = self.checkAlive()
-            if not self.running:
-                continue
-            
             queueEmpty = self.dataQueue.empty()
-            if readyToWrite:
-                try:
-                    # Send any data which may be in the queue
-                    while not self.dataQueue.empty():
-                        message = self.dataQueue.get()
-                        # print(f"Sending {message} to {self.role}")
-                        self.sock.sendall(message)
-                except Exception as e:
-                    print('[EXCEPT] - xmit data to {} [{}:{}]: {}'.format(self.role, self.host, self.port, e))
-                    abort = True
+            readyToRead, readyToWrite, inError = self.checkAlive()
+            if not queueEmpty and readyToWrite:
+                abort = self.sendQueue()
             
             if abort:
                 self.proxy.disconnect()
-                continue
 
             # Prevent the CPU from Melting
             # Sleep if we didn't get any data or if we didn't send
@@ -258,14 +254,12 @@ class SocketHandler(Thread):
         # Stopped, clean up socket.
         if self.sock is None:
             return
-        try:
-            self.sock.shutdown(2) # 0: done recv, 1: done xmit, 2: both
-        except Exception as e:
-            pass
-        try:
-            self.sock.close()
-        except Exception as e:
-            pass
+        # Send all remaining messages.
+        sleep(0.1)
+        self.sendQueue()
+        sleep(0.1)
+
+        self.sock.close()
         self.sock = None
         return
 
