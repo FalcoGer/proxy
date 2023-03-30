@@ -65,9 +65,9 @@ def handleUserInput(cmd: str, proxy: Proxy) -> bool:
             proxy.disconnect()
 
     # More commands go here.
-    elif cmd.upper() == 'EXAMPLE':
-        for _ in range(0, 10):
-            proxy.sendToClient(b'EXAMPLE\n')
+    #elif cmd.upper() == 'EXAMPLE':
+    #    for _ in range(0, 10):
+    #        proxy.sendToClient(b'EXAMPLE\n')
     
     # Empty command to avoid errors on empty commands.
     elif len(cmd.strip()) == 0:
