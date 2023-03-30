@@ -240,7 +240,7 @@ class SocketHandler(Thread):
                     # Send any data which may be in the queue
                     while not self.dataQueue.empty():
                         message = self.dataQueue.get()
-                        print(f"Sending {message} to {self.role}")
+                        # print(f"Sending {message} to {self.role}")
                         self.sock.sendall(message)
                 except Exception as e:
                     print('[EXCEPT] - xmit data to {} [{}:{}]: {}'.format(self.role, self.host, self.port, e))
