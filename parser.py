@@ -3,19 +3,54 @@ import struct
 # queue is used as a thread safe data structure for packets to be sent to the client or server
 import queue
 
-SERVER_QUEUE = queue.SimpleQueue()
-CLIENT_QUEUE = queue.SimpleQueue()
+from proxy import Proxy
 
-def parse(data, port, origin):
+
+def parse(data: bytes, port: int, origin: str, proxy: Proxy) -> None:
     sign = '->' if origin == 'client' else '<-'
     print(f"c{sign}s: {data}")
-    # do interesting stuff with the data!
-    # don't append to queue to just drop the package
-    if data.find(b'fuck') >= 0:
-        print("Dropped")
-        return
+
+    # Do interesting stuff with the data here!
+
+    # A construct like this may be used to drop packets. 
+    #if data.find(b'\xFF\xFF\xFF\xFF') >= 0:
+    #    print("Dropped")
+    #    return
+
+    # By default, append the data as is to the queue to send it to the client/server.
     if (origin == 'client'):
-        SERVER_QUEUE.put(data)
+        proxy.sendToServer(data)
     elif (origin == 'server'):
-        CLIENT_QUEUE.put(data)
+        proxy.sendToClient(data)
+
+def handleUserInput(cmd: str, proxy: Proxy) -> bool:
+    if cmd.upper() == 'QUIT' or cmd.upper() == 'EXIT':
+        return False
+    
+    # Send arbitrary bytes to the server.
+    if cmd[0:2].upper() == 'S ':
+        pkt = bytes.fromhex(cmd[2:])
+        if proxy.running:
+            proxy.sendToServer(pkt)
+    
+    # Send arbitrary bytes to the client.
+    elif cmd[0:2].upper() == 'C ':
+        pkt = bytes.fromhex(cmd[2:])
+        if proxy.running:
+            proxy.sendToClient(pkt)
+
+    # More commands go here.
+    elif cmd.upper() == 'EXAMPLE':
+        print('Example text goes here.')
+        for _ in range(0, 10):
+            proxy.sendToClient(b'EXAMPLE\n')
+    
+    # Empty command to avoid errors on empty commands.
+    elif len(cmd.strip()) == 0:
+        pass
+    else:
+        print(f"Undefined command: \"{cmd}\"")
+    
+    # Keep going.
+    return True
 
