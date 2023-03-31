@@ -1,6 +1,7 @@
 #/bin/python3
 
 # struct is used to decode bytes into primitive data types
+# https://docs.python.org/3/library/struct.html
 import struct
 from proxy import Proxy
 from hexdump import hexdump
