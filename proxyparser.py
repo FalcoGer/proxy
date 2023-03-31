@@ -7,6 +7,11 @@ from proxy import Proxy, ESocketRole
 from hexdump import hexdump
 from enum import Enum, auto
 
+# TODO:
+# - Add support for escape sequences in CLI
+# - Add support for variables in CLI
+#     ex. httpRequest=GET / HTTP/1.0\n\n
+# - Replace calls to application.cmd_... with application.getReadlineModule()...
 
 ###############################################################################
 # Setting storage stuff goes here.
@@ -126,9 +131,9 @@ def cmd_help(userInput: str, proxy: Proxy) -> bool:
         print(f"{key.rjust(maxLen)} - {helptext}")
 
     print("Readline extensions are available.")
-    print("Use TAB for auto completion")
-    print("Use CTRL+R for history search.")
-    print("Use !idx to execute a command from the history again.")
+    print("  Use TAB for auto completion")
+    print("  Use CTRL+R for history search.")
+    print("  Use !idx to execute a command from the history again.")
     return True
 
 def cmd_quit(userInput: str, proxy: Proxy) -> bool:
@@ -229,7 +234,7 @@ def handleUserInput(userInput: str, proxy: Proxy) -> bool:
         function, helptext = cmdList[cmd]
         return function(userInput, proxy)
     else:
-        print(f"Undefined command: \"{cmd}\"")
+        raise ValueError(f"Undefined command: \"{cmd}\"")
     
     # Keep going.
     return True

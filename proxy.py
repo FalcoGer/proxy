@@ -337,27 +337,35 @@ class Completer():
 
                 self.candidates = []
                 
-                # Check these first, check history only if no matches found.
-                if self.getWordIdx() == 0:
-                    if len(self.origline) > 0 and self.origline[0] == '!':
-                        # Complete history indexes
-                        self.getHistIdxCandidates()
-                    else:
-                        # Root commands only make sense at the start of the line.
-                        self.getRootCandidates()
+                if self.getWordIdx() == 0 and not (len(self.origline) > 0 and self.being_completed[0] == "!"):
+                    # Commands only make sense at the start of the line.
+                    self.getRootCandidates()
+                elif len(self.being_completed) > 0 and self.being_completed[0] == "!":
+                    # Complete history indexes
+                    self.getHistIdxCandidates()
                 else:
+                    # Complete filenames
                     self.getFileCandidates()
-                    # Show history completions only if there are not too many paths to complete or if there is no entry at all.
+                    # Show history completions only if there are not too many file name completions
+                    # or if there is no string to complete at all.
                     if len(self.candidates) <= 8 or len(self.being_completed) == 0:
                         self.getHistoryCandidates()
+
             # Return the answer!
             try:
                 response = self.candidates[state]
+                # expand the history completion to the full line
+                if len(self.candidates) == 1 and response is not None and len(response) > 0 and response[0] == "!":
+                    histIdx = int(response[1:])
+                    response = readline.get_history_item(histIdx)
             except IndexError as e:
                 response = None
         except Exception as e:
             print(e)
             print(traceback.format_exc())
+        
+        # print(f"Completion.\n  stage: {state}\n  response: {response}\n  candidates: {self.candidates}\n  being_completed: {self.being_completed}\n  origline: {self.origline}\n  start/end: {self.begin}/{self.end}\n")
+
         return response
 
     def getRootCandidates(self) -> None:
@@ -376,18 +384,12 @@ class Completer():
             if historyline is None or historyline == "":
                 continue
             
-            # get the whole line
+            # Get the whole line.
             if historyline.startswith(self.origline):
                 # Must only append to the part that is currently being completed
                 # otherwise the whole line may be added again.
                 self.candidates.append(historyline[self.begin:])
             
-            # get individual fragments
-            #self.candidates.extend([
-            #        s
-            #        for s in historyline.split(" ")
-            #        if s and s.startswith(self.being_completed)
-            #    ])
         return
     
     def getHistIdxCandidates(self) -> None:
@@ -397,8 +399,8 @@ class Completer():
             if historyLine is None or historyLine == "":
                 continue
 
-            if str(historyIdx).startswith(self.origline[1:]):
-                self.candidates.append(str(historyIdx))
+            if str(historyIdx).startswith(self.being_completed[1:]):
+                self.candidates.append("!" + str(historyIdx))
         return
 
     def getFileCandidates(self) -> None:
@@ -460,6 +462,8 @@ class Application():
         readline.parse_and_bind('set editing-mode vi')
         readline.set_auto_history(False)
         readline.set_history_length(512)
+        # allow for completion of !<histIdx>
+        readline.set_completer_delims(readline.get_completer_delims().replace("!", ""))
         try:
             if os.path.exists("history.log"):
                 readline.read_history_file("history.log")
@@ -490,20 +494,37 @@ class Application():
                     lastHistoryItem = readline.get_history_item(readline.get_current_history_length())
                     
                     # Expand !<histIdx>
-                    if len(cmd) >= 2 and cmd[0] == '!':
-                        histIdx = int(cmd[1:].strip())
-                        if histIdx >= 0 and histIdx < readline.get_current_history_length():
-                            historyItem = readline.get_history_item(histIdx)
-                            if historyItem is not None:
-                                cmd = historyItem
-                                print(f"Exanded: {cmd}")
-                            else:
-                                raise ValueError(f"History item {histIdx} is None")
-                        else:
-                            raise IndexError(f"No such history item with index {histIdx}.")
-
+                    words = cmd.split(" ")
+                    idx = 0
+                    expanded = False
+                    for word in words:
+                        try:
+                            if word.startswith("!"):
+                                histIdx = int(word[1:])
+                                if histIdx >= 0 and histIdx < readline.get_current_history_length():
+                                    historyItem = readline.get_history_item(histIdx)
+                                    if historyItem is not None:
+                                        words[idx] = historyItem
+                                        expanded = True
+                        except ValueError as e:
+                            pass
+                        finally:
+                            idx += 1
+                    # reassemble cmd
+                    cmd = " ".join(words)
+                    if expanded:
+                        print(f"Expanded: {cmd}")
+                    
+                    # Add the item to the history
                     if cmd != lastHistoryItem:
                         readline.add_history(cmd)
+                        
+                        # For some reason history completion is not available on the last item sent.
+                        # Reload the history file to have history completion available on the last item, too.
+                        readline.append_history_file(1, "history.log")
+                        readline.clear_history()
+                        readline.read_history_file("history.log")
+
                     running = parser.handleUserInput(cmd, proxy)
 
             except Exception as e:
@@ -515,7 +536,8 @@ class Application():
         readline.write_history_file("history.log")
         # Kill all threads and let the OS free all resources.
         os._exit(0)
-
+    
+    # readline inaccessible through proxyparse and can't import because it nukes the settings.
     def cmd_showhistory(self, idx: int = -1) -> None:
         if idx >= 0 and idx < readline.get_current_history_length():
             historyline = readline.get_history_item(idx)
@@ -532,13 +554,14 @@ class Application():
         if idx >= 0 and idx < readline.get_current_history_length():
             historyline = readline.get_history_item(idx)
             readline.remove_history_item(idx)
-            readline.write_history_file("history.log")
             print(f"Item {idx} deleted: {historyline}")
         elif idx == -1:
             readline.clear_history()
             print("History deleted.")
         else:
             raise IndexError("History index out of range.")
+        
+        readline.write_history_file("history.log")
         return
 
 
