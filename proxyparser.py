@@ -112,10 +112,10 @@ def buildCommandDict() -> dict:
     ret['help']         = (cmd_help, 'Print available commands.')
     ret['printhexdump'] = (cmd_printhexdump, 'Toggle the printing of packets when they are being parsed.')
     ret['sh']           = (cmd_sh, 'Send arbitrary hex values to the server.\nUsage: "sh" hexstring \nExample: sh 41424344')
-    ret['ss']           = (cmd_ss, 'Send arbitrary strings to the server.\nUsage: "ss" string\nExample: ss hello!\nNote: Leading spaces in the string are sent\nexcept for the space between the command and\nthe first character of the string.')
+    ret['ss']           = (cmd_ss, 'Send arbitrary strings to the server.\nUsage: "ss" string\nExample: ss hello!\\n\nNote: Leading spaces in the string are sent\nexcept for the space between the command and\nthe first character of the string.\nEscape sequences are available.')
     ret['sf']           = (cmd_sf, 'Send arbitrary files to the server.\nUsage: "sf" filename\nExample: sf /home/user/.bashrc')
     ret['ch']           = (cmd_ch, 'Send arbitrary hex values to the client.\nUsage: "ch" hexstring \nExample: ch 41424344')
-    ret['cs']           = (cmd_cs, 'Send arbitrary strings to the client.\nUsage: "cs" string\nExample: cs hello!\nNote: Leading spaces in the string are sent\nexcept for the space between the command and\nthe first character of the string.')
+    ret['cs']           = (cmd_cs, 'Send arbitrary strings to the client.\nUsage: "cs" string\nExample: cs hello!\\n\nNote: Leading spaces in the string are sent\nexcept for the space between the command and\nthe first character of the string.\nEscape sequences are available.')
     ret['cf']           = (cmd_cf, 'Send arbitrary files to the client.\nUsage: "cf" filename\nExample: cf /home/user/.bashrc')
     return ret
 
