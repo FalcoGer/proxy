@@ -321,8 +321,10 @@ def escape(data: bytes) -> bytes:
                 raise Exception("\\uxxxx is not supported")
             elif nextByte == b'U':
                 raise Exception("\\Uxxxxxxxx is not supported")
+            elif nextByte == b'N':
+                raise Exception("\\N{Name} is not supported")
             else:
-                raise ValueError("Invalid escape sequence at index {idx} in {data}: \\{repr(nextByte)[2:-1]}")
+                raise ValueError(f"Invalid escape sequence at index {idx} in {data}: \\{repr(nextByte)[2:-1]}")
         else:
             # No escape sequence. Just add the byte as is
             newData += b
