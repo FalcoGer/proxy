@@ -2,7 +2,6 @@
 
 # struct is used to decode bytes into primitive data types
 import struct
-from socket import socket
 from proxy import Proxy
 from hexdump import hexdump
 
