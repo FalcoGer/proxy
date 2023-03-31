@@ -40,7 +40,7 @@ class ESocketRole(Enum):
             return self.value == other
         if other is str:
             return self.name == other
-        if repr(type(other)) == repr(type(other)):
+        if repr(type(self)) == repr(type(other)):
             return self.value == other.value
         return False
 
@@ -49,7 +49,7 @@ class ESocketRole(Enum):
             return self.value > other
         if other is str:
             return self.name > other
-        if repr(type(other)) == repr(type(other)):
+        if repr(type(self)) == repr(type(other)):
             return self.value > other.value
         raise ValueError("Can not compare.")
 
