@@ -393,7 +393,27 @@ class Completer():
         return
     
     def getHistIdxCandidates(self) -> None:
+        # Complete possible values only if there is not a complete match.
+        # If there is a complete match, return that one only.
+        # For example if completing "!3" but "!30" and "!31" are also available
+        # then return only "!3".
+
         historyIndexes = [i for i in range(0, readline.get_current_history_length())]
+        
+        if len(self.being_completed) > 1:
+            historyIdx = -1
+            try:
+                historyIdx = int(self.being_completed[1:])
+            except ValueError as e:
+                pass
+
+            if historyIdx in historyIndexes \
+                    and readline.get_history_item(historyIdx) is not None \
+                    and str(historyIdx) == self.being_completed[1:]:
+                self.candidates.append(self.being_completed) # this is the match we want to resolve
+                return
+
+
         for historyIdx in historyIndexes:
             historyLine = readline.get_history_item(historyIdx)
             if historyLine is None or historyLine == "":
