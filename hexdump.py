@@ -36,4 +36,5 @@ def hexdump(src: bytes, bytesPerLine: int = 16, bytesPerGroup: int = 4, sep: str
                 printable += " "
 
         lines.append(f'{addr:0{maxAddrLen}X}  {hexString}  |{printable}|')
+    lines.append(f'{len(src):0{maxAddrLen}X}  ({len(src)} Bytes)')
     return lines
