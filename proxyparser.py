@@ -10,6 +10,8 @@ def buildCommandDict() -> dict:
     ret = {}
     ret['quit']         = (cmd_quit, 'Stop the proxy and quit.')
     ret['exit']         = ret['quit']
+    ret['clhist']       = (cmd_clearhistory, 'Clear the command history.\nAdd an integer to only clear that particular entry.\nNote: The history file will instantly be overwritten.')
+    ret['lshist']       = (cmd_showhistory, 'Show the command history.\nAdd an integer to only display that particular entry.')
     ret['disconnect']   = (cmd_disconnect, 'Disconnect from the client and server and wait for a new connection.')
     ret['help']         = (cmd_help, 'Print available commands.')
     ret['sh']           = (cmd_sh, 'Send arbitrary hex values to the server.\nUsage: "sh" hexstring \nExample: sh 41424344')
@@ -99,6 +101,22 @@ def cmd_cf(userInput: str, proxy: Proxy) -> bool:
 def cmd_disconnect(userInput: str, proxy: Proxy) -> bool:
     if proxy.running:
         proxy.disconnect()
+    return True
+
+def cmd_showhistory(userInput: str, proxy: Proxy) -> bool:
+    if userInput.strip() != "":
+        idx = int(userInput)
+    else:
+        idx = -1
+    proxy.application.cmd_showhistory(idx)
+    return True
+
+def cmd_clearhistory(userInput: str, proxy: Proxy) -> bool:
+    if userInput.strip() != "":
+        idx = int(userInput)
+    else:
+        idx = -1
+    proxy.application.cmd_clearhistory(idx)
     return True
 
 def handleUserInput(userInput: str, proxy: Proxy) -> bool:

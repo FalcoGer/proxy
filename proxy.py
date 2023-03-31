@@ -30,9 +30,11 @@ from importlib import reload
 import proxyparser as parser
 
 class Proxy(Thread):
-    def __init__(self, bindAddr: str, remoteAddr: str, localPort: int, remotePort: int):
+    def __init__(self, application, bindAddr: str, remoteAddr: str, localPort: int, remotePort: int):
         super().__init__()
- 
+
+        self.application = application
+
         self.running = False
         self.identifier = f"{bindAddr}:{localPort} -> {remoteAddr}:{remotePort}"
 
@@ -328,7 +330,7 @@ class Completer():
 
     def getHistoryCandidates(self) -> None:
         # Get candidates from the history
-        history = [readline.get_history_item(i) for i in range(0, readline.get_history_length())]
+        history = [readline.get_history_item(i) for i in range(0, readline.get_current_history_length())]
         for historyline in history:
             if historyline is None:
                 continue
@@ -363,7 +365,7 @@ class Completer():
             files = os.listdir(directory)
             # Find which of those files matches the end of the path
             for file in files:
-                if os.path.isdir(file):
+                if os.path.isdir(os.path.join(directory, file)):
                     file += "/"
                 if file.startswith(filenameStart):
                     self.candidates.append(file)
@@ -380,49 +382,80 @@ class Completer():
 
 ###############################################################################
 
-def main():
-    # parse command line arguments.
-    arg_parser = argparse.ArgumentParser(description='Create a proxy connection.')
-    arg_parser.add_argument('-b', '--bind', required=False, help='Bind IP-address for the listening socket. Default \'0.0.0.0\'', default='0.0.0.0')
-    arg_parser.add_argument('-r', '--remote', required=True, help='Remote host IP-address to connect to.')
-    arg_parser.add_argument('-l', '--localport', type=int, required=True, help='Local port number to bind to.')
-    arg_parser.add_argument('-p', '--remoteport', type=int, required=True, help='Remote port number to connect to.')
-
-    args = arg_parser.parse_args()
-
-    # Setup readline
-    completer = Completer()
-    readline.parse_and_bind('tab: complete')
-    readline.parse_and_bind('set editing-mode vi')
-    readline.set_auto_history(True)
-    readline.set_history_length(512)
-    try:
-        if os.path.exists("history.log"):
-            readline.read_history_file("history.log")
-    except Exception as e:
+class Application():
+    def __init__(self):
         pass
 
-    readline.set_completer(completer.complete)
+    def main(self) -> None:
+        # parse command line arguments.
+        arg_parser = argparse.ArgumentParser(description='Create a proxy connection.')
+        arg_parser.add_argument('-b', '--bind', required=False, help='Bind IP-address for the listening socket. Default \'0.0.0.0\'', default='0.0.0.0')
+        arg_parser.add_argument('-r', '--remote', required=True, help='Remote host IP-address to connect to.')
+        arg_parser.add_argument('-l', '--localport', type=int, required=True, help='Local port number to bind to.')
+        arg_parser.add_argument('-p', '--remoteport', type=int, required=True, help='Remote port number to connect to.')
 
-    # Create a proxy with, binding on all interfaces.
-    proxy = Proxy(args.bind, args.remote, args.localport, args.remoteport)
-    proxy.start()
+        args = arg_parser.parse_args()
 
-    # Accept user input and parse it.
-    running = True
-    while running:
+        # Setup readline
+        completer = Completer()
+        readline.parse_and_bind('tab: complete')
+        readline.parse_and_bind('set editing-mode vi')
+        readline.set_auto_history(True)
+        readline.set_history_length(512)
         try:
-            reload(parser)
-
-            cmd = input('$ ')
-            running = parser.handleUserInput(cmd, proxy)
+            if os.path.exists("history.log"):
+                readline.read_history_file("history.log")
         except Exception as e:
-            print('[EXCEPT] - User Input: {}'.format(e))
-    
-    # Save the history file.
-    readline.write_history_file("history.log")
-    # Kill all threads and let the OS free all resources.
-    os._exit(0)
+            pass
+
+        readline.set_completer(completer.complete)
+
+        # Create a proxy with, binding on all interfaces.
+        proxy = Proxy(self, args.bind, args.remote, args.localport, args.remoteport)
+        proxy.start()
+
+        # Accept user input and parse it.
+        running = True
+        while running:
+            try:
+                reload(parser)
+
+                cmd = input('$ ')
+                running = parser.handleUserInput(cmd, proxy)
+            except Exception as e:
+                print('[EXCEPT] - User Input: {}'.format(e))
+        
+        # Save the history file.
+        readline.write_history_file("history.log")
+        # Kill all threads and let the OS free all resources.
+        os._exit(0)
+
+    def cmd_showhistory(self, idx: int = -1) -> None:
+        if idx >= 0 and idx < readline.get_current_history_length():
+            historyline = readline.get_history_item(idx)
+            print(f"{idx} - {historyline}")
+        elif idx == -1:
+            for idx in range(0, readline.get_current_history_length()):
+                historyline = readline.get_history_item(idx)
+                print(f"{idx} - {historyline}")
+        else:
+            raise IndexError("History index out of range.")
+        return
+
+    def cmd_clearhistory(self, idx: int = -1) -> None:
+        if idx >= 0 and idx < readline.get_current_history_length():
+            historyline = readline.get_history_item(idx)
+            readline.remove_history_item(idx)
+            readline.write_history_file("history.log")
+            print(f"Item {idx} deleted: {historyline}")
+        elif idx == -1:
+            readline.clear_history()
+            print("History deleted.")
+        else:
+            raise IndexError("History index out of range.")
+        return
+
 
 if __name__ == '__main__':
-    main()
+    application = Application()
+    application.main()
