@@ -517,13 +517,10 @@ class Application():
                     
                     # Add the item to the history
                     if cmd != lastHistoryItem:
+                        # FIXME: For some reason history completion is not available on the last item sent.
+                        # Reloading the history file doesn't seem to fix it.
                         readline.add_history(cmd)
-                        
-                        # For some reason history completion is not available on the last item sent.
-                        # Reload the history file to have history completion available on the last item, too.
                         readline.append_history_file(1, "history.log")
-                        readline.clear_history()
-                        readline.read_history_file("history.log")
 
                     running = parser.handleUserInput(cmd, proxy)
 
@@ -537,33 +534,8 @@ class Application():
         # Kill all threads and let the OS free all resources.
         os._exit(0)
     
-    # readline inaccessible through proxyparse and can't import because it nukes the settings.
-    def cmd_showhistory(self, idx: int = -1) -> None:
-        if idx >= 0 and idx < readline.get_current_history_length():
-            historyline = readline.get_history_item(idx)
-            print(f"{idx} - {historyline}")
-        elif idx == -1:
-            for idx in range(0, readline.get_current_history_length()):
-                historyline = readline.get_history_item(idx)
-                print(f"{idx} - {historyline}")
-        else:
-            raise IndexError("History index out of range.")
-        return
-
-    def cmd_clearhistory(self, idx: int = -1) -> None:
-        if idx >= 0 and idx < readline.get_current_history_length():
-            historyline = readline.get_history_item(idx)
-            readline.remove_history_item(idx)
-            print(f"Item {idx} deleted: {historyline}")
-        elif idx == -1:
-            readline.clear_history()
-            print("History deleted.")
-        else:
-            raise IndexError("History index out of range.")
-        
-        readline.write_history_file("history.log")
-        return
-
+    def getReadlineModule(self):
+        return readline
 
 if __name__ == '__main__':
     application = Application()

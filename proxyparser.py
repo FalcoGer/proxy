@@ -8,10 +8,12 @@ from hexdump import hexdump
 from enum import Enum, auto
 
 # TODO:
-# - Add support for escape sequences in CLI
 # - Add support for variables in CLI
 #     ex. httpRequest=GET / HTTP/1.0\n\n
-# - Replace calls to application.cmd_... with application.getReadlineModule()...
+# - Add commands to alter hexdump output format
+# - Add colors to hexdump, mark ascii/numbers/low/high non printable and alternate intensity between every other byte
+# - Add debug commands to use struct to unpack hex data and print out values to help analyzing traffic
+#     ex "unpack_int_le 41000000" -> struct.unpack(">I", b'41000000') -> DEC: 65, HEX: 41, ...
 
 ###############################################################################
 # Setting storage stuff goes here.
@@ -147,6 +149,7 @@ def cmd_sh(userInput: str, proxy: Proxy) -> bool:
 
 def cmd_ss(userInput: str, proxy: Proxy) -> bool:
     pkt = str.encode(userInput, 'utf-8')
+    pkt = escape(pkt)
     if proxy.running:
         proxy.sendToServer(pkt)
     return True
@@ -163,6 +166,7 @@ def cmd_ch(userInput: str, proxy: Proxy) -> bool:
 
 def cmd_cs(userInput: str, proxy: Proxy) -> bool:
     pkt = str.encode(userInput, 'utf-8')
+    pkt = escape(pkt)
     if proxy.running:
         proxy.sendToClient(pkt)
     return True
@@ -177,19 +181,41 @@ def cmd_disconnect(userInput: str, proxy: Proxy) -> bool:
     return True
 
 def cmd_showhistory(userInput: str, proxy: Proxy) -> bool:
+    readline = proxy.application.getReadlineModule()
+    
+    idx = -1
     if userInput.strip() != "":
         idx = int(userInput)
+    
+    if idx >= 0 and idx < readline.get_current_history_length():
+        historyline = readline.get_history_item(idx)
+        print(f"{idx} - {historyline}")
+    elif idx == -1:
+        for idx in range(0, readline.get_current_history_length()):
+            historyline = readline.get_history_item(idx)
+            print(f"{idx} - {historyline}")
     else:
-        idx = -1
-    proxy.application.cmd_showhistory(idx)
+        raise IndexError("History index out of range.")
     return True
 
 def cmd_clearhistory(userInput: str, proxy: Proxy) -> bool:
+    readline = proxy.application.getReadlineModule()
+
+    idx = -1
     if userInput.strip() != "":
         idx = int(userInput)
+
+    if idx >= 0 and idx < readline.get_current_history_length():
+        historyline = readline.get_history_item(idx)
+        readline.remove_history_item(idx)
+        print(f"Item {idx} deleted: {historyline}")
+    elif idx == -1:
+        readline.clear_history()
+        print("History deleted.")
     else:
-        idx = -1
-    proxy.application.cmd_clearhistory(idx)
+        raise IndexError("History index out of range.")
+    
+    readline.write_history_file("history.log")
     return True
 
 def cmd_lssettings(userInput: str, proxy: Proxy) -> bool:
@@ -256,4 +282,53 @@ def getSetting(settingKey: ESettingKey, proxy: Proxy) -> object:
 def setSetting(settingKey: ESettingKey, settingValue: object, proxy: Proxy) -> None:
     proxy.setSetting(settingKey, settingValue)
     return
+
+# replaces escape sequences with the proper values
+def escape(data: bytes) -> bytes:
+    idx = 0
+    newData = b''
+    while idx < len(data):
+        b = intToByte(data[idx])
+        if b == b'\\':
+            idx += 1 # Add one to the index so we don't read the escape sequence byte as a normal byte.
+            nextByte = intToByte(data[idx]) # May throw IndexError, pass it up to the user.
+            if nextByte == b'\\':
+                newData += b'\\'
+            elif nextByte == b'n':
+                newData += b'\n'
+            elif nextByte == b'r':
+                newData += b'\r'
+            elif nextByte == b't':
+                newData += b'\t'
+            elif nextByte == b'b':
+                newData += b'\b'
+            elif nextByte == b'f':
+                newData += b'\f'
+            elif nextByte == b'v':
+                newData += b'\v'
+            elif nextByte == b'0':
+                newData += b'\0'
+            elif nextByte == b'x':
+                newData += bytes.fromhex(data[idx+1:idx+3].decode())
+                idx += 2 # skip 2 more bytes.
+            elif ord(nextByte) in range(ord(b'0'), ord(b'7') + 1):
+                octalBytes = data[idx:idx+3]
+                num = int(octalBytes, 7)
+                newData += intToByte(num)
+                idx += 2 # skip 2 more bytes
+                
+            elif nextByte == b'u':
+                raise Exception("\\uxxxx is not supported")
+            elif nextByte == b'U':
+                raise Exception("\\Uxxxxxxxx is not supported")
+            else:
+                raise ValueError("Invalid escape sequence at index {idx} in {data}: \\{repr(nextByte)[2:-1]}")
+        else:
+            # No escape sequence. Just add the byte as is
+            newData += b
+        idx += 1
+    return newData
+
+def intToByte(i: int) -> bytes:
+    return struct.pack('=b', i if i < 128 else i - 256)
 
