@@ -6,6 +6,8 @@ import traceback
 import os
 import argparse
 
+from enum import Enum, auto
+
 # For networking
 import socket
 import select
@@ -29,6 +31,29 @@ from importlib import reload
 # This is where users may do live edits and alter the behavior of the proxy.
 import proxyparser as parser
 
+class ESocketRole(Enum):
+    server = auto()
+    client = auto()
+
+    def __eq__(self, other) -> bool:
+        if other is int:
+            return self.value == other
+        if other is str:
+            return self.name == other
+        if repr(type(other)) == repr(type(other)):
+            return self.value == other.value
+        return False
+
+    def __gt__(self, other) -> bool:
+        if other is int:
+            return self.value > other
+        if other is str:
+            return self.name > other
+        if repr(type(other)) == repr(type(other)):
+            return self.value > other.value
+        raise ValueError("Can not compare.")
+
+
 class Proxy(Thread):
     def __init__(self, application, bindAddr: str, remoteAddr: str, localPort: int, remotePort: int):
         super().__init__()
@@ -47,6 +72,8 @@ class Proxy(Thread):
         self.bindSocket = None
         self.server = None
         self.client = None
+
+        self.settings = {}
 
         self.bind(self.bindAddr, self.localPort)
         return
@@ -77,19 +104,19 @@ class Proxy(Thread):
             self.running = True
         return
 
-    def sendData(self, destination: str, data: bytes) -> None:
-        sh = self.client if destination == 'c' else self.server
+    def sendData(self, destination: ESocketRole, data: bytes) -> None:
+        sh = self.client if destination == ESocketRole.client else self.server
         if sh is None:
             return
         sh.send(data)
         return
     
     def sendToServer(self, data: bytes) -> None:
-        self.sendData('s', data)
+        self.sendData(ESocketRole.server, data)
         return
     
     def sendToClient(self, data: bytes) -> None:
-        self.sendData('c', data)
+        self.sendData(ESocketRole.client, data)
         return
 
     def getClient(self) -> (str, int):
@@ -114,7 +141,7 @@ class Proxy(Thread):
     def waitForClient(self) -> None:
         oldClient = self.client
         sock, addr = self.bindSocket.accept()
-        self.client = SocketHandler(sock, (self.remoteAddr, self.remotePort), 'c', self)
+        self.client = SocketHandler(sock, (self.remoteAddr, self.remotePort), ESocketRole.client, self)
         
         # Disconnect the old client if there was one.
         if oldClient is not None:
@@ -138,7 +165,7 @@ class Proxy(Thread):
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect((self.remoteAddr, self.remotePort))
-            self.server = SocketHandler(sock, self.getClient(), 's', self)
+            self.server = SocketHandler(sock, self.getClient(), ESocketRole.server, self)
         except Exception as e:
             print('[proxy({})] Unable to connect to server {}:{}. {}'.format(self.identifier, self.remoteAddr, self.remotePort, e))
             if self.client is not None:
@@ -158,16 +185,25 @@ class Proxy(Thread):
         
         return
 
+    def getSetting(self, settingKey) -> object:
+        if settingKey in self.settings.keys():
+            return self.settings[settingKey]
+        return None
+
+    def setSetting(self, settingKey, settingValue: object) -> None:
+        self.settings[settingKey] = settingValue
+        return
+
 ###############################################################################
 
 # This class owns a socket, receives all it's data and accepts data into a queue to be sent to that socket.
 class SocketHandler(Thread):
-    def __init__(self, sock: socket.socket, other: (str, int), role: str, proxy: Proxy):
+    def __init__(self, sock: socket.socket, other: (str, int), role: ESocketRole, proxy: Proxy):
         super().__init__()
         
         self.sock = sock   # The socket
         self.other = other # The other socket host and port for output in the parser
-        self.role = role   # Either 'c' or 's'
+        self.role = role   # Either client or server
         self.proxy = proxy # To pass to the parser
         
         # Get this once, so there is no need to check for validity of the socket later.
@@ -209,10 +245,10 @@ class SocketHandler(Thread):
             # Send any data which may be in the queue
             while not self.dataQueue.empty():
                 message = self.dataQueue.get()
-                #print(f">>> Sending {len(message)} Bytes to {self.role}")
+                #print(f">>> Sending {len(message)} Bytes to {self.role.name}")
                 self.sock.sendall(message)
         except Exception as e:
-            print('[EXCEPT] - xmit data to {} [{}:{}]: {}'.format(self.role, self.host, self.port, e))
+            print('[EXCEPT] - xmit data to {} [{}:{}]: {}'.format(self.role.name, self.host, self.port, e))
             abort = True
         return abort
 
@@ -234,7 +270,7 @@ class SocketHandler(Thread):
                     # No data was available at the time.
                     pass
                 except Exception as e:
-                    print('[EXCEPT] - recv data from {} [{}:{}]: {}'.format(self.role, self.host, self.port, e))
+                    print('[EXCEPT] - recv data from {} [{}:{}]: {}'.format(self.role.name, self.host, self.port, e))
                     abort = True
             
             # If we got data, parse it.
@@ -244,7 +280,8 @@ class SocketHandler(Thread):
                     # The parser adds any packages it actually wants to forward for the server to the queue.
                     parser.parse(data, (self.host, self.port), self.other, self.role, self.proxy)
                 except Exception as e:
-                    print('[EXCEPT] - parse data from {} [{}:{}]: {}'.format(self.role, self.host, self.port, e))
+                    print('[EXCEPT] - parse data from {} [{}:{}]: {}'.format(self.role.name, self.host, self.port, e))
+                    print(traceback.format_exc())
                     self.stop()
             
             # Send the queue
@@ -433,6 +470,8 @@ class Application():
 
             except Exception as e:
                 print('[EXCEPT] - User Input: {}'.format(e))
+                print(traceback.format_exc())
+
         
         # Save the history file.
         readline.write_history_file("history.log")
@@ -454,7 +493,6 @@ class Application():
     def cmd_clearhistory(self, idx: int = -1) -> None:
         if idx >= 0 and idx < readline.get_current_history_length():
             historyline = readline.get_history_item(idx)
-            # FIXME: doesn't work.
             readline.remove_history_item(idx)
             readline.write_history_file("history.log")
             print(f"Item {idx} deleted: {historyline}")
