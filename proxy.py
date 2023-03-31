@@ -1,7 +1,9 @@
 #!/bin/python3
 
+# debugging
+import traceback
+
 import os
-import sys
 import argparse
 
 # For networking
@@ -14,6 +16,12 @@ from queue import SimpleQueue
 # For creating multiple threads
 from threading import Thread
 from time import sleep
+
+# This allows auto completion and history browsing
+try:
+    import gnureadline as readline
+except ImportError:
+    import readline
 
 # This allows us to reload a python file
 from importlib import reload
@@ -266,6 +274,112 @@ class SocketHandler(Thread):
 
 ###############################################################################
 
+class Completer():
+    def __init__(self):
+        self.origline = ""
+        self.begin = 0
+        self.end = 0
+        self.being_completed = ""
+        self.words = []
+        
+        self.candidates = []
+
+    def complete(self, text: str, state: int) -> str:
+        try:
+            response = None
+            # First tab press for this string (state is 0), build the list of candidates.
+            if state == 0:
+                # Get line buffer info
+                self.origline = readline.get_line_buffer()
+                self.begin = readline.get_begidx()
+                self.end = readline.get_endidx()
+                self.being_completed = self.origline[self.begin:self.end]
+                self.words = self.origline.split(' ')
+
+                self.candidates = []
+                
+                # Check these first, check history only if no matches found.
+                if self.getWordIdx() == 0:
+                    # Root commands only make sense at the start of the line.
+                    self.getRootCandidates()
+                else:
+                    self.getFileCandidates()
+                    # Show history completions only if there are not too many paths to complete or if there is no entry at all.
+                    if len(self.candidates) <= 8 or len(self.being_completed) == 0:
+                        self.getHistoryCandidates()
+            # Return the answer!
+            try:
+                response = self.candidates[state]
+            except IndexError as e:
+                response = None
+        except Exception as e:
+            print(e)
+            print(traceback.format_exc())
+        return response
+
+    def getRootCandidates(self) -> None:
+        self.candidates.extend( [
+                s
+                for s in parser.buildCommandDict().keys()
+                if s and s.startswith(self.being_completed)
+            ]
+        )
+        return
+
+    def getHistoryCandidates(self) -> None:
+        # Get candidates from the history
+        history = [readline.get_history_item(i) for i in range(0, readline.get_history_length())]
+        for historyline in history:
+            if historyline is None:
+                continue
+
+            self.candidates.extend([
+                    s
+                    for s in historyline.split(" ")
+                    if s and s.startswith(self.being_completed)
+                ])
+        return
+
+    def getFileCandidates(self) -> None:
+        # Append candidates for files
+        # Find which word we are current completing
+        word = self.words[self.getWordIdx()]
+
+        # Find which directory we are in
+        directory = "./"
+        filenameStart = ""
+        if word:
+            # There is at least some text being completed.
+            if word.find("/") >= 0:
+                # There is a path delimiter in the string, we need to assign the directory and the filename start both.
+                directory = word[:word.rfind("/")] + "/"
+                filenameStart = word[word.rfind("/") + 1:]
+            else:
+                # There is no path delimiters in the string. We're only searching the current directory for the file name.
+                filenameStart = word
+                
+        # Find all files and directories in that directory
+        if os.path.isdir(directory):
+            files = os.listdir(directory)
+            # Find which of those files matches the end of the path
+            for file in files:
+                if os.path.isdir(file):
+                    file += "/"
+                if file.startswith(filenameStart):
+                    self.candidates.append(file)
+        return
+
+    def getWordIdx(self) -> int:
+        # Which word are we currently completing
+        wordIdx = 0
+        for idx in range(self.begin - 1, -1, -1):
+            if self.origline[idx] == ' ':
+                wordIdx += 1
+        return wordIdx
+
+
+###############################################################################
+
 def main():
     # parse command line arguments.
     arg_parser = argparse.ArgumentParser(description='Create a proxy connection.')
@@ -276,6 +390,20 @@ def main():
 
     args = arg_parser.parse_args()
 
+    # Setup readline
+    completer = Completer()
+    readline.parse_and_bind('tab: complete')
+    readline.parse_and_bind('set editing-mode vi')
+    readline.set_auto_history(True)
+    readline.set_history_length(512)
+    try:
+        if os.path.exists("history.log"):
+            readline.read_history_file("history.log")
+    except Exception as e:
+        pass
+
+    readline.set_completer(completer.complete)
+
     # Create a proxy with, binding on all interfaces.
     proxy = Proxy(args.bind, args.remote, args.localport, args.remoteport)
     proxy.start()
@@ -284,15 +412,17 @@ def main():
     running = True
     while running:
         try:
+            reload(parser)
+
             cmd = input('$ ')
             running = parser.handleUserInput(cmd, proxy)
-            reload(parser)
         except Exception as e:
             print('[EXCEPT] - User Input: {}'.format(e))
     
-    # Kill all threads and let the OS free all resources
+    # Save the history file.
+    readline.write_history_file("history.log")
+    # Kill all threads and let the OS free all resources.
     os._exit(0)
-
 
 if __name__ == '__main__':
     main()
