@@ -419,9 +419,18 @@ class Application():
         while running:
             try:
                 reload(parser)
+                try:
+                    print("")
+                    cmd = None
+                    cmd = input('$ ')
+                except KeyboardInterrupt:
+                    # Allow clearing the buffer with ctrl+c
+                    if not readline.get_line_buffer():
+                        print("Type 'exit' or 'quit' to exit.")
 
-                cmd = input('$ ')
-                running = parser.handleUserInput(cmd, proxy)
+                if cmd is not None:
+                    running = parser.handleUserInput(cmd, proxy)
+
             except Exception as e:
                 print('[EXCEPT] - User Input: {}'.format(e))
         
