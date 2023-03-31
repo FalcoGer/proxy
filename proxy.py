@@ -454,6 +454,7 @@ class Application():
     def cmd_clearhistory(self, idx: int = -1) -> None:
         if idx >= 0 and idx < readline.get_current_history_length():
             historyline = readline.get_history_item(idx)
+            # FIXME: doesn't work.
             readline.remove_history_item(idx)
             readline.write_history_file("history.log")
             print(f"Item {idx} deleted: {historyline}")
