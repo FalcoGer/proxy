@@ -339,8 +339,12 @@ class Completer():
                 
                 # Check these first, check history only if no matches found.
                 if self.getWordIdx() == 0:
-                    # Root commands only make sense at the start of the line.
-                    self.getRootCandidates()
+                    if len(self.origline) > 0 and self.origline[0] == '!':
+                        # Complete history indexes
+                        self.getHistIdxCandidates()
+                    else:
+                        # Root commands only make sense at the start of the line.
+                        self.getRootCandidates()
                 else:
                     self.getFileCandidates()
                     # Show history completions only if there are not too many paths to complete or if there is no entry at all.
@@ -369,14 +373,32 @@ class Completer():
         # Get candidates from the history
         history = [readline.get_history_item(i) for i in range(0, readline.get_current_history_length())]
         for historyline in history:
-            if historyline is None:
+            if historyline is None or historyline == "":
+                continue
+            
+            # get the whole line
+            if historyline.startswith(self.origline):
+                # Must only append to the part that is currently being completed
+                # otherwise the whole line may be added again.
+                self.candidates.append(historyline[self.begin:])
+            
+            # get individual fragments
+            #self.candidates.extend([
+            #        s
+            #        for s in historyline.split(" ")
+            #        if s and s.startswith(self.being_completed)
+            #    ])
+        return
+    
+    def getHistIdxCandidates(self) -> None:
+        historyIndexes = [i for i in range(0, readline.get_current_history_length())]
+        for historyIdx in historyIndexes:
+            historyLine = readline.get_history_item(historyIdx)
+            if historyLine is None or historyLine == "":
                 continue
 
-            self.candidates.extend([
-                    s
-                    for s in historyline.split(" ")
-                    if s and s.startswith(self.being_completed)
-                ])
+            if str(historyIdx).startswith(self.origline[1:]):
+                self.candidates.append(str(historyIdx))
         return
 
     def getFileCandidates(self) -> None:
@@ -416,7 +438,6 @@ class Completer():
                 wordIdx += 1
         return wordIdx
 
-
 ###############################################################################
 
 class Application():
@@ -437,7 +458,7 @@ class Application():
         completer = Completer()
         readline.parse_and_bind('tab: complete')
         readline.parse_and_bind('set editing-mode vi')
-        readline.set_auto_history(True)
+        readline.set_auto_history(False)
         readline.set_history_length(512)
         try:
             if os.path.exists("history.log"):
@@ -466,6 +487,23 @@ class Application():
                         print("Type 'exit' or 'quit' to exit.")
 
                 if cmd is not None:
+                    lastHistoryItem = readline.get_history_item(readline.get_current_history_length())
+                    
+                    # Expand !<histIdx>
+                    if len(cmd) >= 2 and cmd[0] == '!':
+                        histIdx = int(cmd[1:].strip())
+                        if histIdx >= 0 and histIdx < readline.get_current_history_length():
+                            historyItem = readline.get_history_item(histIdx)
+                            if historyItem is not None:
+                                cmd = historyItem
+                                print(f"Exanded: {cmd}")
+                            else:
+                                raise ValueError(f"History item {histIdx} is None")
+                        else:
+                            raise IndexError(f"No such history item with index {histIdx}.")
+
+                    if cmd != lastHistoryItem:
+                        readline.add_history(cmd)
                     running = parser.handleUserInput(cmd, proxy)
 
             except Exception as e:

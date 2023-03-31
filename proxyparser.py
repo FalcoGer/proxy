@@ -124,6 +124,11 @@ def cmd_help(userInput: str, proxy: Proxy) -> bool:
         function, helptext = commandDict[key]
         helptext = helptext.replace("\n", "\n" + (" " * (maxLen + 8))).strip()
         print(f"{key.rjust(maxLen)} - {helptext}")
+
+    print("Readline extensions are available.")
+    print("Use TAB for auto completion")
+    print("Use CTRL+R for history search.")
+    print("Use !idx to execute a command from the history again.")
     return True
 
 def cmd_quit(userInput: str, proxy: Proxy) -> bool:
