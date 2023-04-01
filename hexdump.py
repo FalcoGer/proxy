@@ -23,6 +23,7 @@ class EColorSettingKey(Enum):
     space = auto()                  # space character (0x20)
     printableHighAscii = auto()     # printable, but value > 127
     control = auto()                # ascii control characters (below 0x20)
+    nullbyte = auto()               # null byte
     nonprintable = auto()           # everything else
     
     def __eq__(self, other) -> bool:
@@ -77,6 +78,7 @@ def hexdump(src: bytes, bytesPerLine: int = 16, bytesPerGroup: int = 4, colorSet
         colorSettings[EColorSettingKey.space]               = ("green", None, ['underline'], ['underline'])
         colorSettings[EColorSettingKey.printableHighAscii]  = ("yellow", None, [], ['dark'])
         colorSettings[EColorSettingKey.nonprintable]        = ("red", None, [], ['dark'])
+        colorSettings[EColorSettingKey.nullbyte]            = ("white", None, [], ['dark'])
 
     for addr in range(0, len(src), bytesPerLine):
         # The chars we need to process for this line
@@ -125,7 +127,10 @@ def constructHexString(byteArray: bytes, bytesPerLine: int, bytesPerGroup: int, 
         byteRepr = f"{b:02X}"
         if colorSettings is not None:
             fg, bg, attrOdd, attrEven = getColorSetting(b, printHighAscii, colorSettings)
-            byteRepr = colored(byteRepr, fg, bg, attrEven if idx % 2 == 0 else attrOdd)
+            attr = attrEven if idx % 2 == 0 else attrOdd
+            if b == 0x20 and 'underline' in attr:
+                attr = attr.remove('underline')
+            byteRepr = colored(byteRepr, fg, bg, attr)
         ret += byteRepr
         idx += 1
 
@@ -168,18 +173,15 @@ def constructPrintableString(byteArray: bytes, bytesPerLine: int, bytesPerGroup:
         if colorSettings is not None:
             fg, bg, attrOdd, attrEven = getColorSetting(b, printHighAscii, colorSettings)
             # Underline and bolden if underscore to make it thicker
+            attr = attrEven if idx % 2 == 0 else attrOdd
             if c == '_':
-                if attrOdd is None:
-                    attrOdd = []
-                if attrEven is None:
-                    attrEven = []
+                if attr is None:
+                    attr = []
                 extraAttributes = ['underline', 'bold']
                 for extraAttribute in extraAttributes:
-                    if extraAttribute not in attrOdd:
+                    if extraAttribute not in attr:
                         attrOdd.append(extraAttribute)
-                    if extraAttribute not in attrEven:
-                        attrEven.append(extraAttribute)
-            c = colored(c, fg, bg, attrEven if idx % 2 == 0 else attrOdd)
+            c = colored(c, fg, bg, attr)
         ret += c
         idx += 1
         
@@ -205,7 +207,13 @@ def getColorSetting(byte: int, printHighAscii: bool, colorSettings: dict) -> (st
     
     # Find out which color setting to use.
     colorSettingKey = None
-    if (not isPrintable and not isControl) or (not printHighAscii and isHighAscii):
+    if byte == 0x00:
+        # null byte
+        colorSettingKey = EColorSettingKey.nullbyte
+    elif byte == 0x20:
+        # space
+        colorSettingKey = EColorSettingKey.space
+    elif (not isPrintable and not isControl) or (not printHighAscii and isHighAscii):
         # non printable, non control
         colorSettingKey = EColorSettingKey.nonprintable
     elif isPrintable and isHighAscii and printHighAscii:
@@ -217,9 +225,6 @@ def getColorSetting(byte: int, printHighAscii: bool, colorSettings: dict) -> (st
     elif isDigit:
         # printable, digit
         colorSettingKey = EColorSettingKey.digits
-    elif byte == 0x20:
-        # space
-        colorSettingKey = EColorSettingKey.space
     elif isLetter:
         # printable, letter
         colorSettingKey = EColorSettingKey.letters
@@ -232,6 +237,7 @@ def getColorSetting(byte: int, printHighAscii: bool, colorSettings: dict) -> (st
     colorSetting = None if colorSettingKey not in colorSettings.keys() else colorSettings[colorSettingKey]
     if colorSetting is None:
         colorSetting = (None, None, None, None)
+    
     return deepcopy(colorSetting)
 
 def constructByteTotal(totalBytes: int, maxAddrLen: int, colorSettings: dict) -> str:
