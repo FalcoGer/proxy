@@ -11,7 +11,6 @@ from enum import Enum, auto
 # - Add support for variables in CLI
 #     ex. httpRequest=GET / HTTP/1.0\n\n
 # - Add commands to alter hexdump output format
-# - Add colors to hexdump, mark ascii/numbers/low/high non printable and alternate intensity between every other byte
 # - Add debug commands to use struct to unpack hex data and print out values to help analyzing traffic
 #     ex "unpack_int_le 41000000" -> struct.unpack(">I", b'41000000') -> DEC: 65, HEX: 41, ...
 
