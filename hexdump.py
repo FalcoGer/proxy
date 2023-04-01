@@ -1,4 +1,5 @@
 from enum import Enum, auto
+from copy import deepcopy
 
 _colorAvailable = False
 
@@ -19,6 +20,7 @@ class EColorSettingKey(Enum):
     digits = auto()                 # ascii digits
     letters = auto()                # ascii letters (a-z, A-Z)
     printable = auto()              # other ascii characters
+    space = auto()                  # space character (0x20)
     printableHighAscii = auto()     # printable, but value > 127
     control = auto()                # ascii control characters (below 0x20)
     nonprintable = auto()           # everything else
@@ -64,16 +66,17 @@ def hexdump(src: bytes, bytesPerLine: int = 16, bytesPerGroup: int = 4, colorSet
         colorSettings = {}
         # Formatting
         colorSettings[EColorSettingKey.address]             = ("yellow", None, ['bold'], None)
-        colorSettings[EColorSettingKey.spacerMajor]         = (None, None, None, None)
-        colorSettings[EColorSettingKey.spacerMinor]         = (None, None, None, None)
+        colorSettings[EColorSettingKey.spacerMajor]         = (None, None, [], None)
+        colorSettings[EColorSettingKey.spacerMinor]         = (None, None, [], None)
         colorSettings[EColorSettingKey.byteTotal]           = (None, None, ['bold', 'underline'], None)
         # Data
-        colorSettings[EColorSettingKey.control]             = ("magenta", None, None, ['dark'])
-        colorSettings[EColorSettingKey.digits]              = ("blue", None, None, ['dark'])
-        colorSettings[EColorSettingKey.letters]             = ("green", None, None, ['dark'])
-        colorSettings[EColorSettingKey.printable]           = ("cyan", None, None, ['dark'])
-        colorSettings[EColorSettingKey.printableHighAscii]  = ("yellow", None, None, ['dark'])
-        colorSettings[EColorSettingKey.nonprintable]        = ("red", None, None, ['dark'])
+        colorSettings[EColorSettingKey.control]             = ("magenta", None, [], ['dark'])
+        colorSettings[EColorSettingKey.digits]              = ("blue", None, [], ['dark'])
+        colorSettings[EColorSettingKey.letters]             = ("green", None, [], ['dark'])
+        colorSettings[EColorSettingKey.printable]           = ("cyan", None, [], ['dark'])
+        colorSettings[EColorSettingKey.space]               = ("green", None, ['underline'], ['underline'])
+        colorSettings[EColorSettingKey.printableHighAscii]  = ("yellow", None, [], ['dark'])
+        colorSettings[EColorSettingKey.nonprintable]        = ("red", None, [], ['dark'])
 
     for addr in range(0, len(src), bytesPerLine):
         # The chars we need to process for this line
@@ -164,6 +167,18 @@ def constructPrintableString(byteArray: bytes, bytesPerLine: int, bytesPerGroup:
         # colorize c
         if colorSettings is not None:
             fg, bg, attrOdd, attrEven = getColorSetting(b, printHighAscii, colorSettings)
+            # Underline and bolden if underscore to make it thicker
+            if c == '_':
+                if attrOdd is None:
+                    attrOdd = []
+                if attrEven is None:
+                    attrEven = []
+                extraAttributes = ['underline', 'bold']
+                for extraAttribute in extraAttributes:
+                    if extraAttribute not in attrOdd:
+                        attrOdd.append(extraAttribute)
+                    if extraAttribute not in attrEven:
+                        attrEven.append(extraAttribute)
             c = colored(c, fg, bg, attrEven if idx % 2 == 0 else attrOdd)
         ret += c
         idx += 1
@@ -187,31 +202,37 @@ def getColorSetting(byte: int, printHighAscii: bool, colorSettings: dict) -> (st
     isControl = byte < 0x20
     isDigit = byte >= ord('0') and byte <= ord('9')
     isLetter = (byte >= ord('a') and byte <= ord('z')) or (byte >= ord('A') and byte <= ord('Z'))
-
+    
+    # Find out which color setting to use.
+    colorSettingKey = None
     if (not isPrintable and not isControl) or (not printHighAscii and isHighAscii):
         # non printable, non control
-        colorSetting = None if EColorSettingKey.nonprintable not in colorSettings.keys() else colorSettings[EColorSettingKey.nonprintable]
+        colorSettingKey = EColorSettingKey.nonprintable
     elif isPrintable and isHighAscii and printHighAscii:
         # printable high ascii
-        colorSetting = None if EColorSettingKey.printableHighAscii not in colorSettings.keys() else colorSettings[EColorSettingKey.printableHighAscii]
+        colorSettingKey = EColorSettingKey.printableHighAscii
     elif isControl:
         # control
-        colorSetting = None if EColorSettingKey.control not in colorSettings.keys() else colorSettings[EColorSettingKey.control]
+        colorSettingKey = EColorSettingKey.control
     elif isDigit:
         # printable, digit
-        colorSetting = None if EColorSettingKey.digits not in colorSettings.keys() else colorSettings[EColorSettingKey.digits]
+        colorSettingKey = EColorSettingKey.digits
+    elif byte == 0x20:
+        # space
+        colorSettingKey = EColorSettingKey.space
     elif isLetter:
         # printable, letter
-        colorSetting = None if EColorSettingKey.letters not in colorSettings.keys() else colorSettings[EColorSettingKey.letters]
+        colorSettingKey = EColorSettingKey.letters
     elif isPrintable:
         # other printable
-        colorSetting = None if EColorSettingKey.printable not in colorSettings.keys() else colorSettings[EColorSettingKey.printable]
+        colorSettingKey = EColorSettingKey.printable
     else:
         raise ValueError(f"Can't figure out which color setting to use for {byte:02X}")
-
+    
+    colorSetting = None if colorSettingKey not in colorSettings.keys() else colorSettings[colorSettingKey]
     if colorSetting is None:
         colorSetting = (None, None, None, None)
-    return colorSetting
+    return deepcopy(colorSetting)
 
 def constructByteTotal(totalBytes: int, maxAddrLen: int, colorSettings: dict) -> str:
     maxAddr = constructAddress(totalBytes, maxAddrLen, colorSettings)
