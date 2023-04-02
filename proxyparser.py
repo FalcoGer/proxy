@@ -55,9 +55,9 @@ def settingsDefaults(settingKey: ESettingKey) -> object:
     if settingKey == ESettingKey.printPacketNotification:
         return True
     if settingKey == ESettingKey.hexdumpBytesPerLine:
-        return 32
+        return 16
     if settingKey == ESettingKey.hexdumpBytesPerGroup:
-        return 8
+        return 4
     if settingKey == ESettingKey.hexdumpPrintHighAscii:
         return False
     if settingKey == ESettingKey.hexdumpNonprintableChar:
@@ -140,7 +140,7 @@ def buildCommandDict() -> dict:
     ret['loadvars']     = (cmd_loadvars, 'Loads variables from a file\nUsage: loadvars {0}\nNote: Existing variables will be retained.\nUse clearvars before loading if you want the variables from that file only.', [fileCompleter, None])
     ret['clearvars']    = (cmd_clearvars, 'Clears variables.\nUsage: {0}', None)
     ret['pack']         = (cmd_pack, 'Packs data into a different format.\nUsage: {0} datatype format data [...]\nNote: Data is separated by spaces.\nExample: {0} int little_endian 255 0377 0xFF\nExample: {0} byte little_endian 41 42 43 44\nExample: {0} uchar little_endian x41 x42 x43 x44\nRef: https://docs.python.org/3/library/struct.html', [packDataTypeCompleter, packFormatCompleter, historyCompleter])
-    ret['unpack']       = (cmd_unpack, 'Unpacks and displays data from a different format.\nUsage: {0} datatype format hexdata\nNote: Hex data may contain spaces, they are ignored.\nExample: {0} int little_endian 01000000 02000000\nRef: https://docs.python.org/3/library/struct.html', [packDataTypeCompleter, packFormatCompleter, historyCompleter])
+    ret['unpack']       = (cmd_unpack, 'Unpacks and displays data from a different format.\nUsage: {0} datatype format hexdata\nNote: Hex data may contain spaces, they are ignored.\nExample: {0} int little_endian 01000000 02000000\nExample: {} c_string native 41424344\nRef: https://docs.python.org/3/library/struct.html', [packDataTypeCompleter, packFormatCompleter, historyCompleter])
     ret['convert']      = (cmd_convert, 'Converts numbers from one type to all others.\nUsage: {0} [sourceFormat] number\nExample: {0} dec 65\nExample: {0} 0x41', [convertTypeCompleter, historyCompleter, None])
 
     # Alises
