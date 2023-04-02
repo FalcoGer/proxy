@@ -8,11 +8,8 @@ from hexdump import hexdump
 from enum import Enum, auto
 
 # TODO:
-# - Add support for variables in CLI
-#     ex. httpRequest=GET / HTTP/1.0\n\n
 # - Add debug commands to use struct to unpack hex data and print out values to help analyzing traffic
 #     ex "unpack_int_le 41000000" -> struct.unpack(">I", b'41000000') -> DEC: 65, HEX: 41, ...
-# - FIXME completers
 
 ###############################################################################
 # Setting storage stuff goes here.
@@ -176,7 +173,7 @@ def cmd_help(args: list[str], proxy: Proxy) -> object:
     print("  Use TAB for auto completion")
     print("  Use CTRL+R for history search.")
     print("  Use !idx to execute a command from the history again.")
-    print("  Use $varname to exapnd variables.")
+    print("  Use $varname to expand variables.")
     print("  To use a literal ! or $ use \\! and \\$ respectively.")
     return 0
 
