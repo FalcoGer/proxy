@@ -171,6 +171,7 @@ class Proxy(Thread):
             if self.client is not None:
                 self.client.stop()
                 self.client = None
+                self.running = False
 
         return
 
@@ -182,6 +183,8 @@ class Proxy(Thread):
         if self.server is not None:
             self.server.stop()
             self.server = None
+
+        self.running = False
         
         return
 
@@ -193,6 +196,7 @@ class Proxy(Thread):
     def setSetting(self, settingKey, settingValue: object) -> None:
         self.settings[settingKey] = settingValue
         return
+        
 
 ###############################################################################
 
@@ -314,18 +318,21 @@ class SocketHandler(Thread):
 ###############################################################################
 
 class Completer():
-    def __init__(self):
-        self.origline = ""
-        self.begin = 0
-        self.end = 0
-        self.being_completed = ""
-        self.words = []
+    def __init__(self, proxy: Proxy):
+        self.proxy = proxy
+
+        self.origline = ""          # The whole line in the buffer
+        self.begin = 0              # Index of the first character of the currently completed word
+        self.end = 0                # Index of the last character of the currently completed word
+        self.being_completed = ""   # The currently completed word
+        self.words = []             # All words in the buffer.
+        self.wordIdx = 0            # The index of the current word in the buffer
         
-        self.candidates = []
+        self.candidates = []        # Functions append strings that would complete the current word here.
 
     def complete(self, text: str, state: int) -> str:
+        response = None
         try:
-            response = None
             # First tab press for this string (state is 0), build the list of candidates.
             if state == 0:
                 # Get line buffer info
@@ -334,22 +341,50 @@ class Completer():
                 self.end = readline.get_endidx()
                 self.being_completed = self.origline[self.begin:self.end]
                 self.words = self.origline.split(' ')
+                self.wordIdx = self.getWordIdx()
 
                 self.candidates = []
                 
-                if self.getWordIdx() == 0 and not (len(self.origline) > 0 and self.being_completed[0] == "!"):
-                    # Commands only make sense at the start of the line.
-                    self.getRootCandidates()
-                elif len(self.being_completed) > 0 and self.being_completed[0] == "!":
-                    # Complete history indexes
-                    self.getHistIdxCandidates()
+                cmdDict = parser.buildCommandDict()
+
+                if self.being_completed.startswith("!"):
+                    # completing history substitution
+                    self.getHistIdxCandidates(True)
+                elif self.being_completed.startswith("$"):
+                    # completing variable
+                    self.getVariableCandidates(True)
+                elif self.wordIdx == 0:
+                    # Completing arguments
+                    self.getCommandCandidates()
                 else:
-                    # Complete filenames
-                    self.getFileCandidates()
-                    # Show history completions only if there are not too many file name completions
-                    # or if there is no string to complete at all.
-                    if len(self.candidates) <= 8 or len(self.being_completed) == 0:
-                        self.getHistoryCandidates()
+                    # Completing command argument
+                    if self.words[0] not in cmdDict.keys():
+                        # Can't complete if command is invalid
+                        return None
+                    
+                    # retrieve which completer functions are available
+                    _, _, completerFunctionArray = cmdDict[self.words[0]]
+
+                    if completerFunctionArray is None or len(completerFunctionArray) == 0:
+                        # Can't complete if there is no completer function defined
+                        # For example for commands without arguments
+                        return None
+                    
+                    if self.wordIdx - 1 < len(completerFunctionArray):
+                        # Use the completer function with the index of the current word.
+                        # -1 for the command itself.
+                        completerFunction = completerFunctionArray[self.wordIdx - 1]
+                    else:
+                        # Last completer will be used if currently completed word index is higher than
+                        # the amount of completer functions defined for that command
+                        completerFunction = completerFunctionArray[-1]
+
+                    # Don't complete anything if there is no such function defined.
+                    if completerFunction is None:
+                        return None
+                    
+                    # Get candidates.
+                    completerFunction(self)
 
             # Return the answer!
             try:
@@ -368,7 +403,7 @@ class Completer():
 
         return response
 
-    def getRootCandidates(self) -> None:
+    def getCommandCandidates(self) -> None:
         self.candidates.extend( [
                 s
                 for s in parser.buildCommandDict().keys()
@@ -392,7 +427,7 @@ class Completer():
             
         return
     
-    def getHistIdxCandidates(self) -> None:
+    def getHistIdxCandidates(self, includePrefix: bool) -> None:
         # Complete possible values only if there is not a complete match.
         # If there is a complete match, return that one only.
         # For example if completing "!3" but "!30" and "!31" are also available
@@ -400,27 +435,47 @@ class Completer():
 
         historyIndexes = [i for i in range(0, readline.get_current_history_length())]
         
-        if len(self.being_completed) > 1:
+        if len(self.being_completed) > (1 if includePrefix else 0):
             historyIdx = -1
             try:
-                historyIdx = int(self.being_completed[1:])
+                historyIdx = int(self.being_completed[(1 if includePrefix else 0):])
             except ValueError as e:
                 pass
-
+            
+            # if there is a complete and valid (not None) match, return that match only.
             if historyIdx in historyIndexes \
                     and readline.get_history_item(historyIdx) is not None \
-                    and str(historyIdx) == self.being_completed[1:]:
-                self.candidates.append(self.being_completed) # this is the match we want to resolve
+                    and str(historyIdx) == self.being_completed[(1 if includePrefix else 0):]:
+                if includePrefix:
+                    self.candidates.append(self.being_completed)
+                else:
+                    self.candidates.append(self.being_completed[(1 if includePrefix else 0):])
                 return
 
-
+        # If there has not been a complete match, look for other matches.
         for historyIdx in historyIndexes:
             historyLine = readline.get_history_item(historyIdx)
             if historyLine is None or historyLine == "":
+                # Skip invalid options.
                 continue
 
-            if str(historyIdx).startswith(self.being_completed[1:]):
-                self.candidates.append("!" + str(historyIdx))
+            if str(historyIdx).startswith(self.being_completed[(1 if includePrefix else 0):]):
+                self.candidates.append(("!" if includePrefix else "") + str(historyIdx))
+        return
+    
+    def getVariableCandidates(self, includePrefix: bool) -> None:
+        for variableName in self.proxy.application.variables.keys():
+            if (("$" if includePrefix else "") + variableName).startswith(self.being_completed):
+                self.candidates.append(("$" if includePrefix else "") + variableName)
+        return
+
+    def getSettingsCandidates(self) -> None:
+        for settingKey in list(parser.ESettingKey):
+            if self.proxy.getSetting(settingKey) is None:
+                continue
+            settingName = settingKey.name
+            if self.being_completed.startswith(self.being_completed):
+                self.candidates.append(settingName)
         return
 
     def getFileCandidates(self) -> None:
@@ -464,7 +519,8 @@ class Completer():
 
 class Application():
     def __init__(self):
-        pass
+        self.variables = {}
+        self.running = True
 
     def main(self) -> None:
         # parse command line arguments.
@@ -477,32 +533,32 @@ class Application():
         args = arg_parser.parse_args()
 
         # Setup readline
-        completer = Completer()
         readline.parse_and_bind('tab: complete')
         readline.parse_and_bind('set editing-mode vi')
         readline.set_auto_history(False)
         readline.set_history_length(512)
-        # allow for completion of !<histIdx>
-        readline.set_completer_delims(readline.get_completer_delims().replace("!", ""))
+        # allow for completion of !<histIdx> and $<varname>
         try:
             if os.path.exists("history.log"):
                 readline.read_history_file("history.log")
         except Exception as e:
             pass
 
-        readline.set_completer(completer.complete)
-
         # Create a proxy with, binding on all interfaces.
         proxy = Proxy(self, args.bind, args.remote, args.localport, args.remoteport)
         proxy.start()
+        
+        completer = Completer(proxy)
+        readline.set_completer_delims(readline.get_completer_delims().replace("!", "").replace("$", ""))
+        readline.set_completer(completer.complete)
+
 
         # Accept user input and parse it.
-        running = True
-        while running:
+        while self.running:
             try:
                 reload(parser)
                 try:
-                    print("")
+                    print()
                     cmd = None
                     cmd = input('$ ')
                 except KeyboardInterrupt:
@@ -517,37 +573,58 @@ class Application():
                     words = cmd.split(" ")
                     idx = 0
                     expanded = False
+                    
+                    # Expand history substitution
                     for word in words:
-                        try:
-                            if word.startswith("!"):
-                                histIdx = int(word[1:])
-                                if histIdx >= 0 and histIdx < readline.get_current_history_length():
-                                    historyItem = readline.get_history_item(histIdx)
-                                    if historyItem is not None:
-                                        words[idx] = historyItem
-                                        expanded = True
-                        except ValueError as e:
-                            pass
-                        finally:
-                            idx += 1
+                        if word.startswith("!"):
+                            histIdx = int(word[1:]) # Let it throw ValueError to notify user.
+                            if histIdx >= 0 and histIdx < readline.get_current_history_length():
+                                historyItem = readline.get_history_item(histIdx)
+                                if historyItem is not None:
+                                    words[idx] = historyItem
+                                    expanded = True
+                                else:
+                                    raise ValueError("History index {histIdx} points to invalid history entry.")
+                            else:
+                                raise ValueError("History index {histIdx} is out of range.")
+                        idx += 1
+                    # Save it to a different variable to save this to the history.
+                    # This is done to preserve the variable expansion later in the history.
+                    historyExpandedCmd = ' '.join(words)
+                    words = historyExpandedCmd.split(' ')
+                    idx = 0
+                    # Expand variable substitution
+                    for word in words:
+                        if word.startswith("$"):
+                            varname = word[1:]
+                            words[idx] = self.variables[varname] # Let it throw KeyError to notify user.
+                            expanded = True
+
+                        idx += 1
+
                     # reassemble cmd
-                    cmd = " ".join(words)
-                    if expanded:
-                        print(f"Expanded: {cmd}")
+                    variableExpandedCmd = ' '.join(words)
+                    
+                    # resolve escaped ! and $.
+                    escapedCmd = variableExpandedCmd.replace('\\!', '!').replace('\\$', '$') 
+                    if expanded or cmd != escapedCmd:
+                        print(f"Expanded: {escapedCmd}")
                     
                     # Add the item to the history
-                    if cmd != lastHistoryItem:
+                    if historyExpandedCmd != lastHistoryItem and len(historyExpandedCmd) > 0:
                         # FIXME: For some reason history completion is not available on the last item sent.
                         # Reloading the history file doesn't seem to fix it.
-                        readline.add_history(cmd)
+                        readline.add_history(historyExpandedCmd)
                         readline.append_history_file(1, "history.log")
-
-                    running = parser.handleUserInput(cmd, proxy)
+                    
+                    # handle the command
+                    cmdReturn = parser.handleUserInput(escapedCmd, proxy)
+                    if cmdReturn != 0:
+                        print(f"Error: {cmdReturn}")
 
             except Exception as e:
                 print('[EXCEPT] - User Input: {}'.format(e))
                 print(traceback.format_exc())
-
         
         # Save the history file.
         readline.write_history_file("history.log")
@@ -556,6 +633,48 @@ class Application():
     
     def getReadlineModule(self):
         return readline
+
+    def getVariable(self, variableName: str) -> str:
+        if not self.checkVariableName(variableName):
+            raise ValueError(f"Bad variable name: \"{variableName}\"")
+        
+        if variableName in self.variables.keys():
+            return self.variables[variableName]
+        return None
+
+    def setVariable(self, variableName: str, value: str) -> None:
+        if not self.checkVariableName(variableName):
+            raise ValueError(f"Bad variable name: \"{variableName}\"")
+
+        self.variables[variableName] = value
+        return
+
+    def unsetVariable(self, variableName: str) -> bool:
+        if not self.checkVariableName(variableName):
+            raise ValueError(f"Bad variable name: \"{variableName}\"")
+        
+        if variableName not in self.variables.keys():
+            return False
+        self.variables.pop(variableName)
+        return True
+
+    def checkVariableName(self, variableName: str) -> bool:
+        if len(variableName) == 0:
+            # Prevent nonsense
+            return False
+        if '$' in list(variableName):
+            # Prevent errors
+            return False
+        if '\\' in list(variableName):
+            # Prevent errors
+            return False
+        if ' ' in list(variableName):
+            # Prevent herrasy
+            return False
+        # Everything else is fine.
+        return True
+
+###############################################################################
 
 if __name__ == '__main__':
     application = Application()
