@@ -479,10 +479,12 @@ class Completer():
         return
 
     def getFileCandidates(self) -> None:
+        # FIXME: fix completion for paths with spaces
+        
         # Append candidates for files
         # Find which word we are current completing
         word = self.words[self.getWordIdx()]
-
+        
         # Find which directory we are in
         directory = "./"
         filenameStart = ""
@@ -549,7 +551,8 @@ class Application():
         proxy.start()
         
         completer = Completer(proxy)
-        readline.set_completer_delims(readline.get_completer_delims().replace("!", "").replace("$", ""))
+        # readline.set_completer_delims(readline.get_completer_delims().replace("!", "").replace("$", ""))
+        readline.set_completer_delims(' /')
         readline.set_completer(completer.complete)
 
 
