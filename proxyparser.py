@@ -459,10 +459,65 @@ def cmd_lsvar(args: list[str], proxy: Proxy) -> object:
     return 0
 
 def cmd_savevars(args: list[str], proxy: Proxy) -> object:
-    return "Not implemented"
+    if len(args) != 2:
+        print(getHelpText(args[0]))
+        return "Syntax error."
+    
+    filePath = ' '.join(args[1:])
+    try:
+        with open(filePath, "wt") as file:
+            for varName in proxy.application.variables.keys():
+                varValue = proxy.application.getVariable(varName)
+                file.write(f"{varName} {varValue}")
+    except Exception as e:
+        return f"Error writing file \"{filePath}\": {e}"
+
+    return 0
 
 def cmd_loadvars(args: list[str], proxy: Proxy) -> object:
-    return "Not implemented"
+    if len(args) != 2:
+        print(getHelpText(args[0]))
+        return "Syntax error."
+    
+    filePath = ' '.join(args[1:])
+    try:
+        loadedVars = {}
+        with open(filePath, "rt") as file:
+            lineNumber = 0
+            for line in file.readlines():
+                line = line.strip('\n')
+                lineNumber += 1
+                if len(line.strip()) == 0:
+                    # skip empty lines
+                    continue
+
+                try:
+                    if len(line.split(' ')) <= 1:
+                        raise ValueError("Line does not contain a variable-value pair.")
+
+                    varName = line.split(' ')[0]
+                    if not proxy.application.checkVariableName(varName):
+                        raise ValueError(f"Bad variable name: \"{varName}\"")
+
+                    varValue = ' '.join(line.split(' ')[1:])
+                    if len(varValue) == 0:
+                        raise ValueError("Variable value is empty.")
+
+                    if varName in loadedVars.keys():
+                        raise KeyError(f"Variable \"{varName}\" already loaded from this file.")
+
+                    loadedVars[varName] = varValue
+                except (ValueError, KeyError) as e:
+                    return f"Line {lineNumber} \"{line}\", could not extract variable from file \"{filePath}\": {e}"
+        
+        # Everything loaded successfully
+        for varName in loadedVars.keys():
+            proxy.application.setVariable(varName, loadedVars[varName])
+        print(f"{len(loadedVars)} variables loaded successfully.")
+    except Exception as e:
+        return f"Error reading file \"{filePath}\": {e}"
+
+    return 0
 
 def cmd_clearvars(args: list[str], proxy: Proxy) -> object:
     proxy.application.variables = {}
