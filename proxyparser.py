@@ -188,6 +188,7 @@ def cmd_help(args: list[str], proxy: Proxy) -> object:
     print("  Use !idx to execute a command from the history again.")
     print("  Use $varname to expand variables.")
     print("  To use a literal ! or $ use \\! and \\$ respectively.")
+    print("  Where numbers are required, they may be prefixed:\n    - x or 0x for hex\n    - 0, o or 0o for octal\n    - b or 0b for binary\n    - No prefix for decimal.")
     return 0
 
 def cmd_quit(args: list[str], proxy: Proxy) -> object:
@@ -283,14 +284,15 @@ def cmd_lshistory(args: list[str], proxy: Proxy) -> object:
     
     if len(args) == 2:
         try:
-            idx = int(args[1])
+            idx = strToInt(args[1])
         except ValueError as e:
             print(getHelpText(args[0]))
             return f"Syntax error: {e}"
 
         if idx < readline.get_current_history_length():
             historyline = readline.get_history_item(idx)
-            return f"{idx} - \"{historyline}\""
+            print(f"{idx} - \"{historyline}\"")
+            return 0
         else:
             return f"Invalid history index {idx}."
     
@@ -309,7 +311,7 @@ def cmd_clearhistory(args: list[str], proxy: Proxy) -> object:
 
     if len(args) == 2:
         try:
-            idx = int(args[1])
+            idx = strToInt(args[1])
         except ValueError as e:
             print(getHelpText(args[0]))
             return f"Syntax error: {e}"
@@ -369,14 +371,14 @@ def cmd_hexdump(args: list[str], proxy: Proxy) -> object:
 
     if len(args) > 3:
         try:
-            bytesPerGroup = int(args[3])
+            bytesPerGroup = strToInt(args[3])
         except ValueError as e:
             print(getHelpText(args[0]))
             return f"Syntax error: {e}"
     
     if len(args) > 2:
         try:
-            bytesPerLine = int(args[2])
+            bytesPerLine = strToInt(args[2])
             if bytesPerLine < 1:
                 raise ValueError("Can't have less than 1 byte per line.")
         except ValueError as e:
@@ -612,13 +614,7 @@ def cmd_pack_convert(dataTypeString: str, dataStr: str) -> object:
         return bytes.fromhex(dataStr)
     if dataTypeString in ['b', 'B', 'h', 'H', 'i', 'I', 'l', 'L', 'q', 'Q', 'n', 'N', 'P']:
         # integer formats
-        if dataStr.startswith('0x'):
-            return int(dataStr[2:], 16)
-        if dataStr.startswith('x'):
-            return int(dataStr[1:], 16)
-        if dataStr.startswith('0') and len(dataStr) > 1:
-            return int(dataStr[1:], 8)
-        return int(dataStr, 10)
+        return strToInt(dataStr)
     if dataTypeString in ['e', 'f', 'd']:
         # float formats
         return float(dataStr)
@@ -680,37 +676,23 @@ def cmd_convert(args: list[str], proxy: Proxy) -> object:
     if len(args) == 3:
         formatString = args[1]
         numberString = args[2]
+   
+        try:
+            if formatString == 'dec':
+                number = int(numberString, 10)
+            elif formatString == 'hex':
+                number = int(numberString, 16)
+            elif formatString == 'oct':
+                number = int(numberString, 8)
+            elif formatString == 'bin':
+                number = int(numberString, 2)
+            else:
+                raise ValueError("Unknown format string {formatString}")
+        except ValueError as e:
+            return f"Can't convert {numberString} as {formatString} to number: {e}"
     else:
         numberString = args[1]
-        if numberString[0:2] == '0x' or numberString[0] == 'x':
-            formatString = 'hex'
-            numberString = numberString.replace('x', '').lstrip('0')
-        elif numberString[0:2] == '0o' or numberString[0] == 'o':
-            formatString = 'oct'
-            numberString = numberString.replace('o', '').lstrip('0')
-        elif numberString[0:2] == '0b' or numberString[0] == 'b':
-            formatString = 'bin'
-            numberString = numberString.replace('b', '').lstrip('0')
-        else:
-            formatString = 'dec'
-            numberString = numberString.lstrip('0')
-    
-    number = 0
-    # convert the string into the number
-    try:
-        if formatString == 'dec':
-            number = int(numberString, 10)
-        elif formatString == 'hex':
-            number = int(numberString, 16)
-        elif formatString == 'oct':
-            number = int(numberString, 8)
-        elif formatString == 'bin':
-            number = int(numberString, 2)
-        else:
-            raise ValueError("Unknown format string {formatString}")
-    except ValueError as e:
-        return f"Can't convert {numberString} as {formatString} to number: {e}"
-
+        number = strToInt(numberString)
     # print the number
     print(f"DEC: {number}\nHEX: {hex(number)}\nOCT: {oct(number)}\nBIN: {bin(number)}")
     return 0
@@ -871,4 +853,20 @@ def escape(data: bytes) -> bytes:
 
 def intToByte(i: int) -> bytes:
     return struct.pack('=b', i if i < 128 else i - 256)
+
+def strToInt(dataStr: str) -> int:
+    if dataStr.startswith('0x'):
+        return int(dataStr[2:], 16)
+    if dataStr.startswith('x'):
+        return int(dataStr[1:], 16)
+    if dataStr.startswith('0o'):
+        return (int(dataStr[2:], 8))
+    if (dataStr.startswith('0') and len(dataStr) > 1) or dataStr.startswith('o'):
+        return int(dataStr[1:], 8)
+    if dataStr.startswith('0b'):
+        return (int(dataStr[2:], 2))
+    if dataStr.startswith('b'):
+        return (int(dataStr[1:], 2))
+
+    return int(dataStr, 10)
 
