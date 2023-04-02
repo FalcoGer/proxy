@@ -6,11 +6,8 @@ import struct
 from proxy import Proxy, ESocketRole, Completer
 from hexdump import hexdump
 from enum import Enum, auto
+from copy import copy
 import os
-
-# TODO:
-# - Add debug commands to use struct to unpack hex data and print out values to help analyzing traffic
-#     ex "unpack_int_le 41000000" -> struct.unpack(">I", b'41000000') -> DEC: 65, HEX: 41, ...
 
 ###############################################################################
 # Setting storage stuff goes here.
@@ -142,6 +139,8 @@ def buildCommandDict() -> dict:
     ret['savevars']     = (cmd_savevars, 'Saves variables to a file.\nUsage: {0} filepath', [fileCompleter, None])
     ret['loadvars']     = (cmd_loadvars, 'Loads variables from a file\nUsage: loadvars {0}\nNote: Existing variables will be retained.\nUse clearvars before loading if you want the variables from that file only.', [fileCompleter, None])
     ret['clearvars']    = (cmd_clearvars, 'Clears variables.\nUsage: {0}', None)
+    ret['pack']         = (cmd_pack, 'Packs data into a different format.\nUsage: {0} datatype format data [...]\nNote: Data is separated by spaces.\nExample: {0} int little_endian 255 0377 0xFF\nExample: {0} byte little_endian 41 42 43 44\nExample: {0} uchar little_endian x41 x42 x43 x44\nRef: https://docs.python.org/3/library/struct.html', [packDataTypeCompleter, packFormatCompleter, historyCompleter])
+    ret['unpack']       = (cmd_unpack, 'Unpacks and displays data from a different format.\nUsage: {0} datatype format hexdata\nNote: Hex data may contain spaces, they are ignored.\nExample: {0} int little_endian 01000000 02000000\nRef: https://docs.python.org/3/library/struct.html', [packDataTypeCompleter, packFormatCompleter, historyCompleter])
 
     # Alises
     ret['exit']         = ret['quit']
@@ -524,11 +523,187 @@ def cmd_clearvars(args: list[str], proxy: Proxy) -> object:
     print("All variables deleted.")
     return 0
 
+def cmd_pack(args: list[str], proxy: Proxy) -> object:
+    # FIXME: cstring and pascal string not working correctly.
+    if len(args) < 4:
+        print(getHelpText(args[0]))
+        return "Syntax error."
+    
+    formatMapping = cmd_pack_getFormatMapping()
+    dataTypeMapping = cmd_pack_getDataTypeMapping()
+
+    dataCount = len(args) - 3 # Data is separated by spaces
+
+    dataTypeMappingString = args[1]
+    if dataTypeMappingString not in dataTypeMapping.keys():
+        return f"Syntax error. Data type {dataTypeMappingString} unknown, must be one of {dataTypeMapping.keys()}."
+    
+    formatMappingString = args[2]
+    if formatMappingString not in formatMapping.keys():
+        return f"Syntax error. Format {formatMappingString} unknown, must be one of {formatMapping.keys()}."
+    
+    if dataTypeMapping[dataTypeMappingString] in ['n', 'N'] and formatMapping[formatMappingString] != formatMapping['native']:
+        return f"format for data type {dataTypeMappingString} must be native (@)."
+
+    formatString = f"{formatMapping[formatMappingString]}{dataCount}{dataTypeMapping[dataTypeMappingString]}"
+    
+    dataStrArray = args[3:]
+    # Convert data according to the format
+    convertedData = []
+    for dataStr in dataStrArray:
+        data = cmd_pack_convert(dataTypeMapping[dataTypeMappingString], dataStr)
+        convertedData.append(data)
+    try:
+        packedValues = struct.pack(formatString, *convertedData)
+    except struct.error as e:
+        return f"Unable to pack {convertedData} with format {formatString}: {e}"
+    
+    print(f"Packed: {packedValues}")
+    asHex = ''
+    for byte in packedValues:
+        asHex += f"{byte:02X}"
+    print(f"Hex: {asHex}")
+    return 0
+
+def cmd_unpack(args: list[str], proxy: Proxy) -> object:
+    # FIXME: cstring and pascal string not working correctly.
+    if len(args) < 4:
+        print(getHelpText(args[0]))
+        return "Syntax error."
+    
+    formatMapping = cmd_pack_getFormatMapping()
+    dataTypeMapping = cmd_pack_getDataTypeMapping()
+    
+    dataTypeMappingString = args[1]
+    if dataTypeMappingString not in dataTypeMapping.keys():
+        return f"Syntax error. Data type {dataTypeMappingString} unknown, must be one of {dataTypeMapping.keys()}."
+    
+    formatMappingString = args[2]
+    if formatMappingString not in formatMapping.keys():
+        return f"Syntax error. Format {formatMappingString} unknown, must be one of {formatMapping.keys()}."
+    
+    if dataTypeMapping[dataTypeMappingString] in ['n', 'N'] and formatMapping[formatMappingString] != formatMapping['native']:
+        return f"format for data type {dataTypeMappingString} must be native (@)."
+    
+    hexDataStr = ''.join(args[3:]) # Joining on '' eliminates spaces.
+    byteArray = bytes.fromhex(hexDataStr)
+    
+    # calculate how many values we have
+    dataTypeSize = struct.calcsize(f"{formatMapping[formatMappingString]}{dataTypeMapping[dataTypeMappingString]}")
+    if len(byteArray) % dataTypeSize != 0:
+        return f"Expecting a multiple of {dataTypeSize} Bytes, which is the size of type {dataTypeMappingString}, but got {len(byteArray)} Bytes in {byteArray}"
+    dataCount = int(len(byteArray) / dataTypeSize)
+
+    formatString = f"{formatMapping[formatMappingString]}{dataCount}{dataTypeMapping[dataTypeMappingString]}"
+
+    try:
+        unpackedValues = struct.unpack(formatString, byteArray)
+    except struct.error as e:
+        return f"Unable to unpack {byteArray} with format {formatString}: {e}"
+    
+    print(f"Unpacked: {unpackedValues}")
+    return 0
+
+# Converts the string data from the user's input into the correct data type for struct.pack
+def cmd_pack_convert(dataTypeString: str, dataStr: str) -> object:
+    if dataTypeString in ['c', 's', 'p']:
+        # byte array formats
+        return bytes.fromhex(dataStr)
+    if dataTypeString in ['b', 'B', 'h', 'H', 'i', 'I', 'l', 'L', 'q', 'Q', 'n', 'N', 'P']:
+        # integer formats
+        if dataStr.startswith('0x'):
+            return int(dataStr[2:], 16)
+        if dataStr.startswith('x'):
+            return int(dataStr[1:], 16)
+        if dataStr.startswith('0') and len(dataStr) > 1:
+            return int(dataStr[1:], 8)
+        return int(dataStr, 10)
+    if dataTypeString in ['e', 'f', 'd']:
+        # float formats
+        return float(dataStr)
+    raise ValueError(f"Format string {dataTypeString} unknown.")
+
+def cmd_pack_getFormatMapping() -> dict:
+    mapping = {
+        'native': '@',
+        'standard_size': '=',
+        'little_endian': '<',
+        'big_endian': '>',
+        'network': '!'
+    }
+
+    # allow the raw input also
+    values = copy(mapping).values()
+    for value in values:
+        mapping[value] = value
+
+    return mapping
+
+def cmd_pack_getDataTypeMapping() -> dict:
+    mapping = {
+        'byte': 'c',
+        'char': 'b',
+        'uchar': 'B',
+        '_Bool': '?',
+        'short': 'h',
+        'ushort': 'H',
+        'int': 'i',
+        'uint': 'I',
+        'long': 'l',
+        'ulong': 'L',
+        'long_long': 'q',
+        'ulong_long': 'Q',
+        'ssize_t': 'n',
+        'size_t': 'N',
+        'half_float_16bit': 'e',
+        'float': 'f',
+        'double': 'd',
+        'pascal_string': 'p',
+        'c_string': 's',
+        'void_ptr': 'P'
+    }
+    
+    # allow the raw values also
+    values = copy(mapping).values()
+    for value in values:
+        mapping[value] = value
+
+    return mapping
+
 ###############################################################################
 # Completers go here.
 
 def yesNoCompleter(completer: Completer) -> None:
     options = ["yes", "no"]
+    for option in options:
+        if option.startswith(completer.being_completed):
+            completer.candidates.append(option)
+    return
+
+def packDataTypeCompleter(completer: Completer) -> None:
+    options = cmd_pack_getDataTypeMapping().keys()
+    for option in options:
+        if option.startswith(completer.being_completed):
+            completer.candidates.append(option)
+    return
+
+def packFormatCompleter(completer: Completer) -> None:
+    formatMapping = cmd_pack_getFormatMapping()
+    dataTypeMapping = cmd_pack_getDataTypeMapping()
+    # 'n' and 'N' only available in native.
+    nativeOnlyList = []
+    for dataTypeMappingString in dataTypeMapping.keys():
+        if dataTypeMapping[dataTypeMappingString] in ['n', 'N']:
+            nativeOnlyList.append(dataTypeMappingString)
+    
+    if completer.words[1] in nativeOnlyList:
+        completer.candidates.append('native')
+        # '@' also valid, but omit for quicker typing.
+        # completer.candidates.append('@')
+        return
+    
+    # Return all available options
+    options = cmd_pack_getFormatMapping().keys()
     for option in options:
         if option.startswith(completer.being_completed):
             completer.candidates.append(option)
