@@ -141,6 +141,7 @@ def buildCommandDict() -> dict:
     ret['clearvars']    = (cmd_clearvars, 'Clears variables.\nUsage: {0}', None)
     ret['pack']         = (cmd_pack, 'Packs data into a different format.\nUsage: {0} datatype format data [...]\nNote: Data is separated by spaces.\nExample: {0} int little_endian 255 0377 0xFF\nExample: {0} byte little_endian 41 42 43 44\nExample: {0} uchar little_endian x41 x42 x43 x44\nRef: https://docs.python.org/3/library/struct.html', [packDataTypeCompleter, packFormatCompleter, historyCompleter])
     ret['unpack']       = (cmd_unpack, 'Unpacks and displays data from a different format.\nUsage: {0} datatype format hexdata\nNote: Hex data may contain spaces, they are ignored.\nExample: {0} int little_endian 01000000 02000000\nRef: https://docs.python.org/3/library/struct.html', [packDataTypeCompleter, packFormatCompleter, historyCompleter])
+    ret['convert']      = (cmd_convert, 'Converts numbers from one type to all others.\nUsage: {0} sourceFormat number\nExample: {0} dec 65', [convertTypeCompleter, historyCompleter, None])
 
     # Alises
     ret['exit']         = ret['quit']
@@ -670,6 +671,33 @@ def cmd_pack_getDataTypeMapping() -> dict:
 
     return mapping
 
+def cmd_convert(args: list[str], proxy: Proxy) -> object:
+    if len(args) != 3:
+        print(getHelpText[args[0]])
+        return "Syntax error."
+
+    formatString = args[1]
+    numberString = args[2]
+    number = 0
+    try:
+        # convert the string into the number
+        if formatString == 'dec':
+            number = int(numberString, 10)
+        elif formatString == 'hex':
+            number = int(numberString, 16)
+        elif formatString == 'oct':
+            number = int(numberString, 8)
+        elif formatString == 'bin':
+            number = int(numberString, 2)
+        else:
+            raise ValueError("Unknown format string {formatString}")
+    except ValueError as e:
+        return f"Can't convert {numberString} as {formatString} to number: {e}"
+
+    # print the number
+    print(f"DEC: {number}\nHEX: {hex(number)}\nOCT: {oct(number)}\nBIN: {bin(number)}")
+    return 0
+
 ###############################################################################
 # Completers go here.
 
@@ -679,6 +707,14 @@ def yesNoCompleter(completer: Completer) -> None:
         if option.startswith(completer.being_completed):
             completer.candidates.append(option)
     return
+
+def convertTypeCompleter(completer: Completer) -> None:
+    options = ['dec', 'bin', 'oct', 'hex']
+    for option in options:
+        if option.startswith(completer.being_completed):
+            completer.candidates.append(option)
+    return
+
 
 def packDataTypeCompleter(completer: Completer) -> None:
     options = cmd_pack_getDataTypeMapping().keys()
