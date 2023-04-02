@@ -141,7 +141,7 @@ def buildCommandDict() -> dict:
     ret['clearvars']    = (cmd_clearvars, 'Clears variables.\nUsage: {0}', None)
     ret['pack']         = (cmd_pack, 'Packs data into a different format.\nUsage: {0} datatype format data [...]\nNote: Data is separated by spaces.\nExample: {0} int little_endian 255 0377 0xFF\nExample: {0} byte little_endian 41 42 43 44\nExample: {0} uchar little_endian x41 x42 x43 x44\nRef: https://docs.python.org/3/library/struct.html', [packDataTypeCompleter, packFormatCompleter, historyCompleter])
     ret['unpack']       = (cmd_unpack, 'Unpacks and displays data from a different format.\nUsage: {0} datatype format hexdata\nNote: Hex data may contain spaces, they are ignored.\nExample: {0} int little_endian 01000000 02000000\nRef: https://docs.python.org/3/library/struct.html', [packDataTypeCompleter, packFormatCompleter, historyCompleter])
-    ret['convert']      = (cmd_convert, 'Converts numbers from one type to all others.\nUsage: {0} sourceFormat number\nExample: {0} dec 65', [convertTypeCompleter, historyCompleter, None])
+    ret['convert']      = (cmd_convert, 'Converts numbers from one type to all others.\nUsage: {0} [sourceFormat] number\nExample: {0} dec 65\nExample: {0} 0x41', [convertTypeCompleter, historyCompleter, None])
 
     # Alises
     ret['exit']         = ret['quit']
@@ -672,15 +672,32 @@ def cmd_pack_getDataTypeMapping() -> dict:
     return mapping
 
 def cmd_convert(args: list[str], proxy: Proxy) -> object:
-    if len(args) != 3:
-        print(getHelpText[args[0]])
+    if len(args) not in [2, 3]:
+        print(getHelpText(args[0]))
         return "Syntax error."
-
-    formatString = args[1]
-    numberString = args[2]
+    
+    # figure out the format
+    if len(args) == 3:
+        formatString = args[1]
+        numberString = args[2]
+    else:
+        numberString = args[1]
+        if numberString[0:2] == '0x' or numberString[0] == 'x':
+            formatString = 'hex'
+            numberString = numberString.replace('x', '').lstrip('0')
+        elif numberString[0:2] == '0o' or numberString[0] == 'o':
+            formatString = 'oct'
+            numberString = numberString.replace('o', '').lstrip('0')
+        elif numberString[0:2] == '0b' or numberString[0] == 'b':
+            formatString = 'bin'
+            numberString = numberString.replace('b', '').lstrip('0')
+        else:
+            formatString = 'dec'
+            numberString = numberString.lstrip('0')
+    
     number = 0
+    # convert the string into the number
     try:
-        # convert the string into the number
         if formatString == 'dec':
             number = int(numberString, 10)
         elif formatString == 'hex':
