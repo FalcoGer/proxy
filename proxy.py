@@ -523,6 +523,7 @@ class Application():
     def __init__(self):
         self.variables = {}
         self.running = True
+        self.HISTORY_FILE = "history.log"
 
     def main(self) -> None:
         # parse command line arguments.
@@ -541,8 +542,10 @@ class Application():
         readline.set_history_length(512)
         # allow for completion of !<histIdx> and $<varname>
         try:
-            if os.path.exists("history.log"):
-                readline.read_history_file("history.log")
+            if os.path.exists(self.HISTORY_FILE):
+                readline.read_history_file(self.HISTORY_FILE)
+            else:
+                readline.write_history_file(self.HISTORY_FILE)
         except Exception as e:
             pass
 
@@ -618,7 +621,7 @@ class Application():
                         # FIXME: For some reason history completion is not available on the last item sent.
                         # Reloading the history file doesn't seem to fix it.
                         readline.add_history(historyExpandedCmd)
-                        readline.append_history_file(1, "history.log")
+                        readline.append_history_file(1, self.HISTORY_FILE)
                     
                     # handle the command
                     cmdReturn = parser.handleUserInput(escapedCmd, proxy)
@@ -630,7 +633,7 @@ class Application():
                 print(traceback.format_exc())
         
         # Save the history file.
-        readline.write_history_file("history.log")
+        readline.write_history_file(self.HISTORY_FILE)
         # Kill all threads and let the OS free all resources.
         os._exit(0)
     

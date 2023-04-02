@@ -327,7 +327,7 @@ def cmd_clearhistory(args: list[str], proxy: Proxy) -> object:
         print("History deleted.")
     
     # Write back the history file.
-    readline.write_history_file("history.log")
+    readline.write_history_file(proxy.application.HISTORY_FILE)
     return 0
 
 def cmd_lssetting(args: list[str], proxy: Proxy) -> object:
@@ -569,7 +569,6 @@ def cmd_pack(args: list[str], proxy: Proxy) -> object:
     return 0
 
 def cmd_unpack(args: list[str], proxy: Proxy) -> object:
-    # FIXME: cstring and pascal string not working correctly.
     if len(args) < 4:
         print(getHelpText(args[0]))
         return "Syntax error."
