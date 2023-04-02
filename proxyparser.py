@@ -81,7 +81,7 @@ def parse(data: bytes, src: (str, int), dest: (str, int), origin: ESocketRole, p
 
         srcStr = srcStr.rjust(maxLen)
         destStr = destStr.ljust(maxLen)
-        directionStr = "C -> S" if origin == ESocketRole.server else "C <- S"
+        directionStr = "C -> S" if origin == ESocketRole.client else "C <- S"
         print(f"[{directionStr}] - {srcStr}->{destStr} ({len(data)} Byte{'s' if len(data) > 1 else ''})")
 
     if getSetting(ESettingKey.printhexdump, proxy):
