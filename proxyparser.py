@@ -6,6 +6,7 @@ import struct
 from proxy import Proxy, ESocketRole, Completer
 from hexdump import hexdump
 from enum import Enum, auto
+import os
 
 # TODO:
 # - Add debug commands to use struct to unpack hex data and print out values to help analyzing traffic
@@ -185,6 +186,12 @@ def cmd_quit(args: list[str], proxy: Proxy) -> object:
     return 0
 
 def cmd_sh(args: list[str], proxy: Proxy) -> object:
+    return cmd_send_hex(args, ESocketRole.server, proxy)
+
+def cmd_ch(args: list[str], proxy: Proxy) -> object:
+    return cmd_send_hex(args, ESocketRole.client, proxy)
+
+def cmd_send_hex(args: list[str], target: ESocketRole, proxy: Proxy) -> object:
     if len(args) == 1:
         print(getHelpText(args[0]))
         return "Syntax error."
@@ -194,10 +201,16 @@ def cmd_sh(args: list[str], proxy: Proxy) -> object:
         
     pkt = bytes.fromhex(userInput)
     if proxy.running:
-        proxy.sendToServer(pkt)
+        proxy.sendData(target, pkt)
     return 0
 
 def cmd_ss(args: list[str], proxy: Proxy) -> object:
+    return cmd_send_string(args, ESocketRole.server, proxy)
+
+def cmd_cs(args: list[str], proxy: Proxy) -> object:
+    return cmd_send_string(args, ESocketRole.client, proxy)
+
+def cmd_send_string(args: list[str], target: ESocketRole, proxy: Proxy) -> object:
     if len(args) == 1:
         print(getHelpText(args[0]))
         return "Syntax error."
@@ -207,42 +220,36 @@ def cmd_ss(args: list[str], proxy: Proxy) -> object:
     pkt = str.encode(userInput, 'utf-8')
     pkt = escape(pkt)
     if proxy.running:
-        proxy.sendToServer(pkt)
+        proxy.sendData(target, pkt)
     return 0
 
 def cmd_sf(args: list[str], proxy: Proxy) -> object:
-    print("TODO") # TODO
-    return "Not implemented"
+    return cmd_send_file(args, ESocketRole.server, proxy)
 
-def cmd_ch(args: list[str], proxy: Proxy) -> object:
-    if len(args) == 1:
+def cmd_cf(args: list[str], proxy: Proxy) -> object:
+    return cmd_send_file(args, ESocketRole.client, proxy)
+
+def cmd_send_file(args: list[str], target: ESocketRole, proxy: Proxy) -> object:
+    if len(args) != 2:
         print(getHelpText(args[0]))
         return "Syntax error."
     
-    # Allow spaces in input, so join with empty string to remove them.
-    userInput = ''.join(args[1:])
+    filePath = ' '.join(args[1:])
+    if not os.path.isfile(filePath):
+        return f"File \"{filePath}\" does not exist."
+    
+    byteArray = b''
+    try:
+        with open(filePath, "rb") as file:
+            while byte := file.read(1):
+                byteArray += byte
+    except Exception as e:
+        return f"Error reading file \"{filePath}\": {e}"
 
-    pkt = bytes.fromhex(userInput)
     if proxy.running:
-        proxy.sendToClient(pkt)
+        proxy.sendData(target, byteArray)
+
     return 0
-
-def cmd_cs(args: list[str], proxy: Proxy) -> object:
-    if len(args) == 1:
-        print(getHelpText(args[0]))
-        return "Syntax error."
-
-    userInput = ' '.join(args[1:])
-
-    pkt = str.encode(userInput, 'utf-8')
-    pkt = escape(pkt)
-    if proxy.running:
-        proxy.sendToClient(pkt)
-    return 0
-
-def cmd_cf(args: list[str], proxy: Proxy) -> object:
-    print("TODO") # TODO
-    return "Not implemented."
 
 def cmd_disconnect(args: list[str], proxy: Proxy) -> object:
     if len(args) != 1:
