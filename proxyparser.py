@@ -123,23 +123,35 @@ def parse(data: bytes, src: (str, int), dest: (str, int), origin: ESocketRole, p
 # If you don't want to provide more completions, use None at the end.
 def buildCommandDict() -> dict:
     ret = {}
-    ret['quit']         = (cmd_quit, 'Stop the proxy and quit.', None)
+    ret['quit']         = (cmd_quit, 'Stop the proxy and quit.\nUsage: {0}', None)
+    ret['clearhistory'] = (cmd_clearhistory, 'Clear the command history or delete one entry of it.\nUsage: {0} [historyIndex].\nNote: The history file will instantly be overwritten.', None)
+    ret['lshistory']    = (cmd_lshistory, 'Show the command history or display one entry of it.\nUsage: {0} [historyIndex]', None)
+    ret['lssetting']    = (cmd_lssetting, 'Show the current settings or display a specific setting.\nUsage: {0} [settingName]', [settingsCompleter, None])
+    ret['disconnect']   = (cmd_disconnect, 'Disconnect from the client and server and wait for a new connection.\n Usage: {0}', None)
+    ret['help']         = (cmd_help, 'Print available commands. Or the help of a specific command.\nUsage: {0} [command]', [commandCompleter, None])
+    ret['hexdump']      = (cmd_hexdump, 'Configure the hexdump or show current configuration.\nUsage: {0} [yes|no] [bytesPerLine] [bytesPerGroup]', [yesNoCompleter, historyCompleter, historyCompleter, None])
+    ret['sh']           = (cmd_sh, 'Send arbitrary hex values to the server.\nUsage: {0} hexstring \nExample: {0} 41424344\nNote: Spaces are allowed and ignored.', [historyCompleter])
+    ret['ss']           = (cmd_ss, 'Send arbitrary strings to the server.\nUsage: {0} string\nExample: {0} hello\\!\\n\nNote: Leading spaces in the string are sent\nexcept for the space between the command and\nthe first character of the string.\nEscape sequences are available.', [historyCompleter])
+    ret['sf']           = (cmd_sf, 'Send arbitrary files to the server.\nUsage: {0} filename\nExample: {0} /home/user/.bashrc', [fileCompleter, None])
+    ret['ch']           = (cmd_ch, 'Send arbitrary hex values to the client.\nUsage: {0} hexstring \nExample: {0} 41424344', [historyCompleter])
+    ret['cs']           = (cmd_cs, 'Send arbitrary strings to the client.\nUsage: {0} string\nExample: {0} hello!\\n\nNote: Leading spaces in the string are sent\nexcept for the space between the command and\nthe first character of the string.\nEscape sequences are available.', [historyCompleter])
+    ret['cf']           = (cmd_cf, 'Send arbitrary files to the client.\nUsage: {0} filename\nExample: {0} /home/user/.bashrc', [fileCompleter, None])
+    ret['set']          = (cmd_set, 'Sets variable to a value\nUsage: {0} varname value\nExample: {0} httpGet GET / HTTP/1.0\\n', [variableCompleter, historyCompleter])
+    ret['unset']        = (cmd_unset, 'Deletes a variable.\nUsage: {0} varname\nExample: {0} httpGet', [variableCompleter, None])
+    ret['lsvar']        = (cmd_lsvar, 'Lists variables.\nUsage: {0} [varname]\nExample: {0}\nExample: {0} httpGet', [variableCompleter, None])
+    ret['savevars']     = (cmd_savevars, 'Saves variables to a file.\nUsage: {0} filepath', [fileCompleter, None])
+    ret['loadvars']     = (cmd_loadvars, 'Loads variables from a file\nUsage: loadvars {0}\nNote: Existing variables will be retained.\nUse clearvars before loading if you want the variables from that file only.', [fileCompleter, None])
+    ret['clearvars']    = (cmd_clearvars, 'Clears variables.\nUsage: {0}', None)
+
+    # Alises
     ret['exit']         = ret['quit']
-    ret['clhist']       = (cmd_clhist, 'Clear the command history or delete one entry of it.\nUsage: clhist [historyIndex].\nNote: The history file will instantly be overwritten.', None)
-    ret['lshist']       = (cmd_lshist, 'Show the command history or display one entry of it.\nUsage: lshist [historyIndex]', None)
-    ret['lssetting']    = (cmd_lssetting, 'Show the current settings or display a specific setting.\nUsage: lssetting [settingName]', [settingsCompleter, None])
-    ret['disconnect']   = (cmd_disconnect, 'Disconnect from the client and server and wait for a new connection.', None)
-    ret['help']         = (cmd_help, 'Print available commands. Or the help of a specific command.\nUsage: help [command]', [commandCompleter, None])
-    ret['hexdump']      = (cmd_hexdump, 'Configure the hexdump or show current configuration.\nUsage: hexdump [yes|no] [bytesPerLine] [bytesPerGroup]', [yesNoCompleter, historyCompleter, historyCompleter, None])
-    ret['sh']           = (cmd_sh, 'Send arbitrary hex values to the server.\nUsage: sh hexstring \nExample: sh 41424344\nNote: Spaces are allowed and ignored.', [historyCompleter])
-    ret['ss']           = (cmd_ss, 'Send arbitrary strings to the server.\nUsage: ss string\nExample: ss hello!\\n\nNote: Leading spaces in the string are sent\nexcept for the space between the command and\nthe first character of the string.\nEscape sequences are available.', [historyCompleter])
-    ret['sf']           = (cmd_sf, 'Send arbitrary files to the server.\nUsage: sf filename\nExample: sf /home/user/.bashrc', [fileCompleter, None])
-    ret['ch']           = (cmd_ch, 'Send arbitrary hex values to the client.\nUsage: ch hexstring \nExample: ch 41424344', [historyCompleter])
-    ret['cs']           = (cmd_cs, 'Send arbitrary strings to the client.\nUsage: cs string\nExample: cs hello!\\n\nNote: Leading spaces in the string are sent\nexcept for the space between the command and\nthe first character of the string.\nEscape sequences are available.', [historyCompleter])
-    ret['cf']           = (cmd_cf, 'Send arbitrary files to the client.\nUsage: cf filename\nExample: cf /home/user/.bashrc', [fileCompleter, None])
-    ret['set']          = (cmd_set, 'Sets variable to a value\nUsage: set varname value\nExample: set httpGet GET / HTTP/1.0\\n', [variableCompleter, historyCompleter])
-    ret['unset']        = (cmd_unset, 'Deletes a variable\nUsage: "unset varname"\nExample: unset httpGet', [variableCompleter, None])
-    ret['lsvar']        = (cmd_lsvar, 'Lists variables\nUsage: "lsvar [varname]"\nExample: lsvar\nExample: lsvar httpGet', [variableCompleter, None])
+    ret['lss']          = ret['lssetting']
+
+    ret['lsh']          = ret['lshistory']
+    ret['clh']          = ret['clearhistory']
+    
+    ret['lsv']          = ret['lsvar']
+    ret['clv']          = ret['clearvars']
     return ret
 
 def cmd_help(args: list[str], proxy: Proxy) -> object:
@@ -262,7 +274,7 @@ def cmd_disconnect(args: list[str], proxy: Proxy) -> object:
         return "Not connected."
     return 0
 
-def cmd_lshist(args: list[str], proxy: Proxy) -> object:
+def cmd_lshistory(args: list[str], proxy: Proxy) -> object:
     if len(args) > 2:
         print(getHelpText(args[0]))
         return "Syntax error."
@@ -288,7 +300,7 @@ def cmd_lshist(args: list[str], proxy: Proxy) -> object:
         print(f"{idx} - \"{historyline}\"")
     return 0
 
-def cmd_clhist(args: list[str], proxy: Proxy) -> object:
+def cmd_clearhistory(args: list[str], proxy: Proxy) -> object:
     readline = proxy.application.getReadlineModule()
 
     if len(args) > 2:
@@ -446,6 +458,17 @@ def cmd_lsvar(args: list[str], proxy: Proxy) -> object:
         print(f"{varName.rjust(maxVarNameLength)} - \"{varValue}\"")
     return 0
 
+def cmd_savevars(args: list[str], proxy: Proxy) -> object:
+    return "Not implemented"
+
+def cmd_loadvars(args: list[str], proxy: Proxy) -> object:
+    return "Not implemented"
+
+def cmd_clearvars(args: list[str], proxy: Proxy) -> object:
+    proxy.application.variables = {}
+    print("All variables deleted.")
+    return 0
+
 ###############################################################################
 # Completers go here.
 
@@ -497,7 +520,7 @@ def handleUserInput(userInput: str, proxy: Proxy) -> object:
 
 def getHelpText(cmdString: str) -> str:
     _, helpText, _ = buildCommandDict()[cmdString]
-    return helpText
+    return helpText.format(cmdString)
 
 # Wrapper for proxy.getSetting to handle default values. Use this function only in this file.
 # Don't make calls to proxy.getSetting elsewhere.
