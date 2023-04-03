@@ -62,12 +62,12 @@ class Proxy(Thread):
             
             # Connect to the remote host after a client has connected.
             if not self.connect():
-                print(f'[proxy({self.identification})] Could not connect to remote host.')
+                print(f'[proxy({self.identifier})] Could not connect to remote host.')
                 self.client.stop()
                 self.client = None
                 continue
             
-            print(f'[proxy({self.identification})] Connection established.')
+            print(f'[proxy({self.identifier})] Connection established.')
 
             # Start client and server socket handler threads.
             self.client.start()
