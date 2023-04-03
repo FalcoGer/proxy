@@ -1,11 +1,17 @@
+Do:
 - make a better check for when to reload the Parser module in application.py
+- command to toggle notifications
 - allow starting proxies from CLI
 - allow stopping proxies from CLI
 - allow running of scripts from file
 - allow naming of proxies & selecting by name as well as ID
 - allow selecting proxies by remote host and port
-- setting to toggle notifications
 - move the proxy into it's own repo and make it a submodule here
     REF: https://stackoverflow.com/questions/17413493/create-a-submodule-repository-from-a-folder-and-keep-its-git-commit-history
+- re-add typing to function parameters via included module names as namespace (application.proxy instead of importing proxy again)
 
+Fix:
+- Latest command not part of history
+- clearhistory <id> not working
+- pack/unpack c_string and pascal_string not working right
 
