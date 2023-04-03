@@ -1,30 +1,30 @@
 from enum import Enum, auto
 from copy import deepcopy
 
-_colorAvailable = False
+_COLOR_AVAILABLE = False
 
 try:
     from termcolor import colored
-    _colorAvailable = True
-except Exception:
+    _COLOR_AVAILABLE = True
+except ImportError:
     pass
 
 class EColorSettingKey(Enum):
     # For formatting:
-    spacerMajor = auto()            # spacer between address, hex and printable sections, also
-    spacerMinor = auto()            # spacer between byte groups
-    address = auto()                # address at start of line
-    byteTotal = auto()              # color of the byte total at the end
+    SPACER_MAJOR = auto()           # spacer between address, hex and printable sections, also
+    SPACER_MINOR = auto()           # spacer between byte groups
+    ADDRESS = auto()                # address at start of line
+    BYTE_TOTAL = auto()             # color of the byte total at the end
     
     # For data:
-    digits = auto()                 # ascii digits
-    letters = auto()                # ascii letters (a-z, A-Z)
-    printable = auto()              # other ascii characters
-    space = auto()                  # space character (0x20)
-    printableHighAscii = auto()     # printable, but value > 127
-    control = auto()                # ascii control characters (below 0x20)
-    nullbyte = auto()               # null byte
-    nonprintable = auto()           # everything else
+    DIGITS = auto()                 # ascii digits
+    LETTERS = auto()                # ascii letters (a-z, A-Z)
+    PRINTABLE = auto()              # other ascii characters
+    SPACE = auto()                  # space character (0x20)
+    PRINTABLE_HIGH_ASCII = auto()   # printable, but value > 127
+    CONTROL = auto()                # ascii control characters (below 0x20)
+    NULL_BYTE = auto()              # null byte
+    NON_PRINTABLE = auto()          # everything else
     
     def __eq__(self, other) -> bool:
         if other is int:
@@ -36,13 +36,13 @@ class EColorSettingKey(Enum):
         return False
 
     def __gt__(self, other) -> bool:
-      if other is int:
-          return self.value > other
-      if other is str:
-          return self.name > other
-      if repr(type(self)) == repr(type(other)):
-          return self.value > other.value
-      raise ValueError("Can not compare.")
+        if other is int:
+            return self.value > other
+        if other is str:
+            return self.name > other
+        if repr(type(self)) == repr(type(other)):
+            return self.value > other.value
+        raise ValueError("Can not compare.")
 
     def __hash__(self):
         return int.__hash__(self.value)
@@ -59,26 +59,26 @@ def hexdump(src: bytes, bytesPerLine: int = 16, bytesPerGroup: int = 4, colorSet
     if 8 > maxAddrLen:
         maxAddrLen = 8
 
-    global _colorAvailable
-    if not _colorAvailable:
+    global _COLOR_AVAILABLE
+    if not _COLOR_AVAILABLE:
         colorSettings = None
     elif colorSettings is None:
         # color available but not set
         colorSettings = {}
         # Formatting
-        colorSettings[EColorSettingKey.address]             = ("yellow", None, ['bold'], None)
-        colorSettings[EColorSettingKey.spacerMajor]         = (None, None, [], None)
-        colorSettings[EColorSettingKey.spacerMinor]         = (None, None, [], None)
-        colorSettings[EColorSettingKey.byteTotal]           = (None, None, ['bold', 'underline'], None)
+        colorSettings[EColorSettingKey.ADDRESS]                 = ("yellow", None, ['bold'], None)
+        colorSettings[EColorSettingKey.SPACER_MAJOR]            = (None, None, [], None)
+        colorSettings[EColorSettingKey.SPACER_MINOR]            = (None, None, [], None)
+        colorSettings[EColorSettingKey.BYTE_TOTAL]              = (None, None, ['bold', 'underline'], None)
         # Data
-        colorSettings[EColorSettingKey.control]             = ("magenta", None, [], ['dark'])
-        colorSettings[EColorSettingKey.digits]              = ("blue", None, [], ['dark'])
-        colorSettings[EColorSettingKey.letters]             = ("green", None, [], ['dark'])
-        colorSettings[EColorSettingKey.printable]           = ("cyan", None, [], ['dark'])
-        colorSettings[EColorSettingKey.space]               = ("green", None, ['underline'], ['underline'])
-        colorSettings[EColorSettingKey.printableHighAscii]  = ("yellow", None, [], ['dark'])
-        colorSettings[EColorSettingKey.nonprintable]        = ("red", None, [], ['dark'])
-        colorSettings[EColorSettingKey.nullbyte]            = ("white", None, [], ['dark'])
+        colorSettings[EColorSettingKey.CONTROL]                 = ("magenta", None, [], ['dark'])
+        colorSettings[EColorSettingKey.DIGITS]                  = ("blue", None, [], ['dark'])
+        colorSettings[EColorSettingKey.LETTERS]                 = ("green", None, [], ['dark'])
+        colorSettings[EColorSettingKey.PRINTABLE]               = ("cyan", None, [], ['dark'])
+        colorSettings[EColorSettingKey.SPACE]                   = ("green", None, ['underline'], ['underline'])
+        colorSettings[EColorSettingKey.PRINTABLE_HIGH_ASCII]    = ("yellow", None, [], ['dark'])
+        colorSettings[EColorSettingKey.NON_PRINTABLE]           = ("red", None, [], ['dark'])
+        colorSettings[EColorSettingKey.NULL_BYTE]               = ("white", None, [], ['dark'])
 
     for addr in range(0, len(src), bytesPerLine):
         # The chars we need to process for this line
@@ -96,29 +96,26 @@ def constructLine(address: int, maxAddrLen: int, byteArray: bytes, bytesPerLine:
 
 def constructAddress(address: int, maxAddrLen: int, colorSettings: dict) -> str:
     addrString = f"{address:0{maxAddrLen}X}"
-    if colorSettings is not None and EColorSettingKey.address in colorSettings.keys():
-        fg, bg, attr, _ = colorSettings[EColorSettingKey.address]
+    if colorSettings is not None and EColorSettingKey.ADDRESS in colorSettings.keys():
+        fg, bg, attr, _ = colorSettings[EColorSettingKey.ADDRESS]
         addrString = colored(addrString, fg, bg, attr)
     return addrString
 
 def constructMinorSpacer(spacerStr: str, colorSettings: dict) -> str:
-    if colorSettings is None or EColorSettingKey.spacerMinor not in colorSettings.keys():
+    if colorSettings is None or EColorSettingKey.SPACER_MINOR not in colorSettings.keys():
         return spacerStr
-    else:
-        fg, bg, attr, _ = colorSettings[EColorSettingKey.spacerMinor]
-        return colored(spacerStr, fg, bg, attr)
+    fg, bg, attr, _ = colorSettings[EColorSettingKey.SPACER_MINOR]
+    return colored(spacerStr, fg, bg, attr)
 
 def constructMajorSpacer(spacerStr: str, colorSettings: dict) -> str:
-    if colorSettings is None or EColorSettingKey.spacerMinor not in colorSettings.keys():
+    if colorSettings is None or EColorSettingKey.SPACER_MINOR not in colorSettings.keys():
         return spacerStr
-    else:
-        fg, bg, attr, _ = colorSettings[EColorSettingKey.spacerMinor]
-        return colored(spacerStr, fg, bg, attr)
+    fg, bg, attr, _ = colorSettings[EColorSettingKey.SPACER_MINOR]
+    return colored(spacerStr, fg, bg, attr)
 
 def constructHexString(byteArray: bytes, bytesPerLine: int, bytesPerGroup: int, printHighAscii: bool, colorSettings: dict) -> str:
     ret = ""
     minorSpacerStr = ' '
-    lenMinorSpacerStr = len(minorSpacerStr)
     minorSpacer = constructMinorSpacer(minorSpacerStr, colorSettings)
     numMinorSpacers = 0
 
@@ -202,35 +199,35 @@ def getColorSetting(byte: int, printHighAscii: bool, colorSettings: dict) -> (st
     isPrintable = len(repr(chr(byte))) == 3 or repr(chr(byte)) == '\'\\\\\''
     isHighAscii = byte >= 0x80
     isControl = byte < 0x20
-    isDigit = byte >= ord('0') and byte <= ord('9')
-    isLetter = (byte >= ord('a') and byte <= ord('z')) or (byte >= ord('A') and byte <= ord('Z'))
+    isDigit = ord('0') <= byte <= ord('9')
+    isLetter = (ord('a') <= byte <= ord('z')) or (ord('A') <= byte <= ord('Z'))
     
     # Find out which color setting to use.
     colorSettingKey = None
     if byte == 0x00:
         # null byte
-        colorSettingKey = EColorSettingKey.nullbyte
+        colorSettingKey = EColorSettingKey.NULL_BYTE
     elif byte == 0x20:
         # space
-        colorSettingKey = EColorSettingKey.space
+        colorSettingKey = EColorSettingKey.SPACE
     elif (not isPrintable and not isControl) or (not printHighAscii and isHighAscii):
         # non printable, non control
-        colorSettingKey = EColorSettingKey.nonprintable
+        colorSettingKey = EColorSettingKey.NON_PRINTABLE
     elif isPrintable and isHighAscii and printHighAscii:
         # printable high ascii
-        colorSettingKey = EColorSettingKey.printableHighAscii
+        colorSettingKey = EColorSettingKey.PRINTABLE_HIGH_ASCII
     elif isControl:
         # control
-        colorSettingKey = EColorSettingKey.control
+        colorSettingKey = EColorSettingKey.CONTROL
     elif isDigit:
         # printable, digit
-        colorSettingKey = EColorSettingKey.digits
+        colorSettingKey = EColorSettingKey.DIGITS
     elif isLetter:
         # printable, letter
-        colorSettingKey = EColorSettingKey.letters
+        colorSettingKey = EColorSettingKey.LETTERS
     elif isPrintable:
         # other printable
-        colorSettingKey = EColorSettingKey.printable
+        colorSettingKey = EColorSettingKey.PRINTABLE
     else:
         raise ValueError(f"Can't figure out which color setting to use for {byte:02X}")
     
@@ -244,8 +241,8 @@ def constructByteTotal(totalBytes: int, maxAddrLen: int, colorSettings: dict) ->
     maxAddr = constructAddress(totalBytes, maxAddrLen, colorSettings)
     majorSpacer = constructMajorSpacer('   ', colorSettings)
     totalBytesString = f"({totalBytes} Bytes)"
-    if colorSettings is not None and EColorSettingKey.byteTotal in colorSettings.keys():
-        fg, bg, attr, _ = colorSettings[EColorSettingKey.byteTotal]
+    if colorSettings is not None and EColorSettingKey.BYTE_TOTAL in colorSettings.keys():
+        fg, bg, attr, _ = colorSettings[EColorSettingKey.BYTE_TOTAL]
         totalBytesString = colored(totalBytesString, fg, bg, attr)
     ret = f"{maxAddr}{majorSpacer}{totalBytesString}"
     return ret
