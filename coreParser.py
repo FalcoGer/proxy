@@ -15,6 +15,7 @@ from completer import Completer
 #  - allow running of scripts from file
 #  - allow naming of proxies & selecting by name as well as ID
 #  - allow selecting proxies by remote host and port
+#  - setting to toggle notifications
 
 ###############################################################################
 # Setting storage stuff goes here.
