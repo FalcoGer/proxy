@@ -9,15 +9,6 @@ from eSocketRole import ESocketRole
 from hexdump import hexdump
 from completer import Completer
 
-# TODO:
-#   parser needs to know application (for variables, which are global)
-#   proxy doesn't need to know application
-#   proxy needs to know parser
-#   parser functions should take proxy
-#   completer needs to know application, fetch correct parser for completion functions
-#   application should store which parser goes with which proxy
-#   
-
 ###############################################################################
 # Setting storage stuff goes here.
 
