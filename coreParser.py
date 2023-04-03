@@ -9,6 +9,13 @@ from eSocketRole import ESocketRole
 from hexdump import hexdump
 from completer import Completer
 
+# TODO
+#  - allow starting proxies from CLI
+#  - allow stopping proxies from CLI
+#  - allow running of scripts from file
+#  - allow naming of proxies & selecting by name as well as ID
+#  - allow selecting proxies by remote host and port
+
 ###############################################################################
 # Setting storage stuff goes here.
 
