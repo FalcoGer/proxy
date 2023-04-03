@@ -58,7 +58,7 @@ class Proxy(Thread):
             # Client has connected.
             ch, cp = self.getClient()
             self.identifier = f"{ch}:{cp} -> {self.remoteAddr}:{self.remotePort}"
-            print(f"[proxy({self.identifier})] Client connected. Connecting to remote host.")
+            print(f"[proxy({self.identifier})] Client connected.")
             
             # Connect to the remote host after a client has connected.
             if not self.connect():
@@ -145,8 +145,7 @@ class Proxy(Thread):
     def connect(self) -> bool:
         print(f"[proxy({self.identifier})] Connecting to {self.remoteAddr}:{self.remotePort}")
         if self.server is not None:
-            print(f"[proxy({self.identifier})] Already connected to remote host.")
-            return False
+            raise RuntimeError(f"[proxy({self.identifier})] Already connected to remote host.")
 
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
