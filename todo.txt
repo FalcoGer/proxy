@@ -12,6 +12,8 @@ Do:
 
 - add multi parser support
     load from files, reload them smartly (when file changed)
+        REF: imp module!
+        REF: https://www.geeksforgeeks.org/how-to-dynamically-load-modules-or-classes-in-python/
     reload them even if currently selected proxy doesn't use them
     command loadparser filename
 
