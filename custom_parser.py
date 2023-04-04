@@ -7,7 +7,7 @@ from enum import Enum, auto
 from hexdump import Hexdump
 
 # import helper functions from core parser
-from coreParser import CoreParser
+from core_parser import CoreParser as BaseParser
 
 # import stuff for API calls
 from eSocketRole import ESocketRole
@@ -41,7 +41,7 @@ class ESettingKey(Enum):
     def __hash__(self):
         return self.value.__hash__()
 
-class CustomParser(CoreParser):
+class CustomParser(BaseParser):
     # Use this to set sensible defaults for your stored variables.
     def getDefaultSettings(self) -> dict[(Enum, object)]:
         coreDefaultSettings = super().getDefaultSettings()

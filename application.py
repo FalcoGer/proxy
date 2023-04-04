@@ -14,8 +14,8 @@ except ImportError:
 import importlib
 
 from proxy import Proxy
-import customParser as Parser
 
+import custom_parser as Parser
 
 class Application():
     def __init__(self):
