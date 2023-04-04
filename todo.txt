@@ -1,7 +1,6 @@
 Do:
 - command to toggle notifications
 - variable expansion format $(varname) as well as $varname
-- move completers from completer.py to core and base parsers
 
 - allow starting proxies from CLI
     command create name remotehost localport remoteport
@@ -11,14 +10,11 @@ Do:
     command kill [name] - if name empty, kill current and select first
     make sure either always 1 active or some form of fallback is in place if no proxies exist
 
-- make core parser core only (no proxies required)
-  derive base parser from core parser with base functionality with proxies
-  derive custom parsers from that base parser, those are reloaded
-
 - add multi parser support
     load from files, reload them smartly (when file changed)
     reload them even if currently selected proxy doesn't use them
     command loadparser filename
+
 - make a better check for when to reload the Parser module in application.py
 
 - allow running of scripts from file
@@ -31,10 +27,11 @@ Do:
       d[newKey] = d.pop(oldKey)
     make sure that a proxy with that name doesn't exist already
 
-- allow selecting proxies by remote host and port
+- allow selecting proxies by binding port
 
 - move the proxy into it's own repo and make it a submodule here
     REF: https://stackoverflow.com/questions/17413493/create-a-submodule-repository-from-a-folder-and-keep-its-git-commit-history
+
 - make internal variables and functions private with _
     provide getters and setters with proper checks
 

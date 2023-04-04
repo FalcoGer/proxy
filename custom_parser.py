@@ -58,7 +58,7 @@ class CustomParser(BaseParser):
     # Define what should happen when a packet arrives here
     def parse(self, data: bytes, proxy, origin: ESocketRole) -> None:
         super().parse(data, proxy, origin)
-
+        
         # Do interesting stuff with the data here.
         #if data == b'ABCD\n' and origin == ESocketRole.client:
         #    data = b'DCBA\n'
