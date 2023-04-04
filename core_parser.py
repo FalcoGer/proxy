@@ -1,3 +1,7 @@
+# The core parser contains the core functionality of the CLI
+# Only commands that don't require a proxy are ran in here.
+# This is the base class for BaseParser, which in turn is the base class for custom parsers
+
 # struct is used to decode bytes into primitive data types
 # https://docs.python.org/3/library/struct.html
 import struct
@@ -5,18 +9,12 @@ import os
 from enum import Enum, auto
 from copy import copy
 
-from eSocketRole import ESocketRole
-from hexdump import Hexdump
 from completer import Completer
 
 ###############################################################################
 # Setting storage stuff goes here.
 
 class ECoreSettingKey(Enum):
-    HEXDUMP_ENABLED             = auto()
-    HEXDUMP                     = auto()
-    PACKETNOTIFICATION_ENABLED  = auto()
-
     def __eq__(self, other) -> bool:
         if other is int:
             return self.value == other
@@ -59,10 +57,7 @@ class CoreParser():
 
     def getDefaultSettings(self) -> dict[(Enum, object)]:
         return {
-                ECoreSettingKey.HEXDUMP_ENABLED: True,
-                ECoreSettingKey.HEXDUMP: Hexdump(),
-                ECoreSettingKey.PACKETNOTIFICATION_ENABLED: True,
-            }
+        }
 
     def getSetting(self, settingKey: Enum) -> object:
         if settingKey not in self.getSettingKeys():
@@ -74,27 +69,10 @@ class CoreParser():
             self.settings[settingKey] = settingValue
         return settingValue
 
-    def setSetting(self, settingKey: Enum, settingValue: object, proxy) -> None:
+    def setSetting(self, settingKey: Enum, settingValue: object) -> None:
         if settingKey not in self.getSettingKeys():
             raise IndexError(f'Setting Key {settingKey} was not found.')
         self.settings[settingKey] = settingValue
-        return
-
-    ###############################################################################
-    # Packet parsing stuff goes here.
-
-    # Define what should happen when a packet arrives here
-    def parse(self, data: bytes, proxy, origin: ESocketRole) -> None:
-        if self.getSetting(ECoreSettingKey.PACKETNOTIFICATION_ENABLED):
-            # Print out the data in a nice format.
-            directionStr = "C -> S" if origin == ESocketRole.client else "C <- S"
-            maxProxyNameLen = max(len(proxy.name) for proxy in self.application.proxies.values())
-            print(f"{proxy.name.ljust(maxProxyNameLen)} [{directionStr}] - ({len(data)} Byte{'s' if len(data) > 1 else ''})")
-
-        if self.getSetting(ECoreSettingKey.HEXDUMP_ENABLED):
-            hexdumpObj = self.getSetting(ECoreSettingKey.HEXDUMP)
-            hexdumpLines = "\n".join(hexdumpObj.hexdump(data))
-            print(f"{hexdumpLines}")
         return
 
     ###############################################################################
@@ -114,30 +92,22 @@ class CoreParser():
     # If you don't want to provide more completions, use None at the end.
     def buildCommandDict(self) -> dict:
         ret = {}
-        ret['help']         = (self.cmd_help, 'Print available commands. Or the help of a specific command.\nUsage: {0} [command]', [self.commandCompleter, None])
-        ret['quit']         = (self.cmd_quit, 'Stop the proxy and quit.\nUsage: {0}', None)
-        ret['select']       = (self.cmd_select, 'Select a different proxy to give commands to.\nUsage: {0} ID\nNote: Use \"lsproxy\" to figure out the ID.', [self.proxyNameCompleter, None])
-        ret['lsproxy']      = (self.cmd_lsproxy, 'Display all configured proxies and their status.\nUsage: {0}', None)
-        ret['clearhistory'] = (self.cmd_clearhistory, 'Clear the command history or delete one entry of it.\nUsage: {0} [historyIndex].\nNote: The history file will instantly be overwritten.', None)
-        ret['lshistory']    = (self.cmd_lshistory, 'Show the command history or display one entry of it.\nUsage: {0} [historyIndex]', None)
-        ret['lssetting']    = (self.cmd_lssetting, 'Show the current settings or display a specific setting.\nUsage: {0} [settingName]', [self.settingsCompleter, None])
-        ret['disconnect']   = (self.cmd_disconnect, 'Disconnect from the client and server and wait for a new connection.\n Usage: {0}', None)
-        ret['hexdump']      = (self.cmd_hexdump, 'Configure the hexdump or show current configuration.\nUsage: {0} [yes|no] [bytesPerLine] [bytesPerGroup]', [self.yesNoCompleter, self.historyCompleter, self.historyCompleter, None])
-        ret['sh']           = (self.cmd_sh, 'Send arbitrary hex values to the server.\nUsage: {0} hexstring \nExample: {0} 41424344\nNote: Spaces are allowed and ignored.', [self.historyCompleter])
-        ret['ss']           = (self.cmd_ss, 'Send arbitrary strings to the server.\nUsage: {0} string\nExample: {0} hello\\!\\n\nNote: Leading spaces in the string are sent\nexcept for the space between the command and\nthe first character of the string.\nEscape sequences are available.', [self.historyCompleter])
-        ret['sf']           = (self.cmd_sf, 'Send arbitrary files to the server.\nUsage: {0} filename\nExample: {0} /home/user/.bashrc', [self.fileCompleter, None])
-        ret['ch']           = (self.cmd_ch, 'Send arbitrary hex values to the client.\nUsage: {0} hexstring \nExample: {0} 41424344', [self.historyCompleter])
-        ret['cs']           = (self.cmd_cs, 'Send arbitrary strings to the client.\nUsage: {0} string\nExample: {0} hello!\\n\nNote: Leading spaces in the string are sent\nexcept for the space between the command and\nthe first character of the string.\nEscape sequences are available.', [self.historyCompleter])
-        ret['cf']           = (self.cmd_cf, 'Send arbitrary files to the client.\nUsage: {0} filename\nExample: {0} /home/user/.bashrc', [self.fileCompleter, None])
-        ret['set']          = (self.cmd_set, 'Sets variable to a value\nUsage: {0} varname value\nExample: {0} httpGet GET / HTTP/1.0\\n', [self.variableCompleter, self.historyCompleter])
-        ret['unset']        = (self.cmd_unset, 'Deletes a variable.\nUsage: {0} varname\nExample: {0} httpGet', [self.variableCompleter, None])
-        ret['lsvars']        = (self.cmd_lsvars, 'Lists variables.\nUsage: {0} [varname]\nExample: {0}\nExample: {0} httpGet', [self.variableCompleter, None])
-        ret['savevars']     = (self.cmd_savevars, 'Saves variables to a file.\nUsage: {0} filepath', [self.fileCompleter, None])
-        ret['loadvars']     = (self.cmd_loadvars, 'Loads variables from a file\nUsage: {0} filename\nNote: Existing variables will be retained.\nUse clearvars before loading if you want the variables from that file only.', [self.fileCompleter, None])
-        ret['clearvars']    = (self.cmd_clearvars, 'Clears variables.\nUsage: {0}', None)
-        ret['pack']         = (self.cmd_pack, 'Packs data into a different format.\nUsage: {0} datatype format data [...]\nNote: Data is separated by spaces.\nExample: {0} int little_endian 255 0377 0xFF\nExample: {0} byte little_endian 41 42 43 44\nExample: {0} uchar little_endian x41 x42 x43 x44\nRef: https://docs.python.org/3/library/struct.html', [self.packDataTypeCompleter, self.packFormatCompleter, self.historyCompleter])
-        ret['unpack']       = (self.cmd_unpack, 'Unpacks and displays data from a different format.\nUsage: {0} datatype format hexdata\nNote: Hex data may contain spaces, they are ignored.\nExample: {0} int little_endian 01000000 02000000\nExample: {0} c_string native 41424344\nRef: https://docs.python.org/3/library/struct.html', [self.packDataTypeCompleter, self.packFormatCompleter, self.historyCompleter])
-        ret['convert']      = (self.cmd_convert, 'Converts numbers from one type to all others.\nUsage: {0} [sourceFormat] number\nExample: {0} dec 65\nExample: {0} 0x41', [self.convertTypeCompleter, self.historyCompleter, None])
+        ret['help']         = (self._cmd_help, 'Print available commands. Or the help of a specific command.\nUsage: {0} [command]', [self._commandCompleter, None])
+        ret['quit']         = (self._cmd_quit, 'Stop the proxy and quit.\nUsage: {0}', None)
+        ret['select']       = (self._cmd_select, 'Select a different proxy to give commands to.\nUsage: {0} ID\nNote: Use \"lsproxy\" to figure out the ID.', [self._proxyNameCompleter, None])
+        ret['lsproxy']      = (self._cmd_lsproxy, 'Display all configured proxies and their status.\nUsage: {0}', None)
+        ret['clearhistory'] = (self._cmd_clearhistory, 'Clear the command history or delete one entry of it.\nUsage: {0} [historyIndex].\nNote: The history file will instantly be overwritten.', None)
+        ret['lshistory']    = (self._cmd_lshistory, 'Show the command history or display one entry of it.\nUsage: {0} [historyIndex]', None)
+        ret['lssetting']    = (self._cmd_lssetting, 'Show the current settings or display a specific setting.\nUsage: {0} [settingName]', [self._settingsCompleter, None])
+        ret['set']          = (self._cmd_set, 'Sets variable to a value\nUsage: {0} varname value\nExample: {0} httpGet GET / HTTP/1.0\\n', [self._variableCompleter, self._historyCompleter])
+        ret['unset']        = (self._cmd_unset, 'Deletes a variable.\nUsage: {0} varname\nExample: {0} httpGet', [self._variableCompleter, None])
+        ret['lsvars']        = (self._cmd_lsvars, 'Lists variables.\nUsage: {0} [varname]\nExample: {0}\nExample: {0} httpGet', [self._variableCompleter, None])
+        ret['savevars']     = (self._cmd_savevars, 'Saves variables to a file.\nUsage: {0} filepath', [self._fileCompleter, None])
+        ret['loadvars']     = (self._cmd_loadvars, 'Loads variables from a file\nUsage: {0} filename\nNote: Existing variables will be retained.\nUse clearvars before loading if you want the variables from that file only.', [self._fileCompleter, None])
+        ret['clearvars']    = (self._cmd_clearvars, 'Clears variables.\nUsage: {0}', None)
+        ret['pack']         = (self._cmd_pack, 'Packs data into a different format.\nUsage: {0} datatype format data [...]\nNote: Data is separated by spaces.\nExample: {0} int little_endian 255 0377 0xFF\nExample: {0} byte little_endian 41 42 43 44\nExample: {0} uchar little_endian x41 x42 x43 x44\nRef: https://docs.python.org/3/library/struct.html', [self._packDataTypeCompleter, self._packFormatCompleter, self._historyCompleter])
+        ret['unpack']       = (self._cmd_unpack, 'Unpacks and displays data from a different format.\nUsage: {0} datatype format hexdata\nNote: Hex data may contain spaces, they are ignored.\nExample: {0} int little_endian 01000000 02000000\nExample: {0} c_string native 41424344\nRef: https://docs.python.org/3/library/struct.html', [self._packDataTypeCompleter, self._packFormatCompleter, self._historyCompleter])
+        ret['convert']      = (self._cmd_convert, 'Converts numbers from one type to all others.\nUsage: {0} [sourceFormat] number\nExample: {0} dec 65\nExample: {0} 0x41', [self._convertTypeCompleter, self._historyCompleter, None])
 
         # Aliases
         ret['exit']         = ret['quit']
@@ -152,7 +122,7 @@ class CoreParser():
         
         return ret
 
-    def cmd_help(self, args: list[str], proxy) -> object:
+    def _cmd_help(self, args: list[str], proxy) -> object:
         if len(args) > 2:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -184,7 +154,7 @@ class CoreParser():
         print("  Where numbers are required, they may be prefixed:\n    - x or 0x for hex\n    - 0, o or 0o for octal\n    - b or 0b for binary\n    - No prefix for decimal.")
         return 0
 
-    def cmd_select(self, args: list[str], proxy) -> object:
+    def _cmd_select(self, args: list[str], proxy) -> object:
         if len(args) != 2:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -196,7 +166,7 @@ class CoreParser():
         
         return 0
 
-    def cmd_lsproxy(self, args: list[str], proxy) -> object:
+    def _cmd_lsproxy(self, args: list[str], proxy) -> object:
         if len(args) > 1:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -208,93 +178,14 @@ class CoreParser():
             idx += 1
         return 0
 
-    def cmd_quit(self, args: list[str], proxy) -> object:
+    def _cmd_quit(self, args: list[str], proxy) -> object:
         if len(args) > 1:
             print(self.getHelpText(args[0]))
             return "Syntax error."
         self.application.running = False
         return 0
 
-    def cmd_sh(self, args: list[str], proxy) -> object:
-        return self.cmd_send_hex(args, ESocketRole.server, proxy)
-
-    def cmd_ch(self, args: list[str], proxy) -> object:
-        return self.cmd_send_hex(args, ESocketRole.client, proxy)
-
-    def cmd_send_hex(self, args: list[str], target: ESocketRole, proxy) -> object:
-        if len(args) == 1:
-            print(self.getHelpText(args[0]))
-            return "Syntax error."
-
-        # Allow spaces in hex string, so join with empty string to remove them.
-        userInput = ''.join(args[1:])
-            
-        pkt = bytes.fromhex(userInput)
-        if proxy.connected:
-            proxy.sendData(target, pkt)
-            return 0
-        return "Not connected."
-
-    def cmd_ss(self, args: list[str], proxy) -> object:
-        return self.cmd_send_string(args, ESocketRole.server, proxy)
-
-    def cmd_cs(self, args: list[str], proxy) -> object:
-        return self.cmd_send_string(args, ESocketRole.client, proxy)
-
-    def cmd_send_string(self, args: list[str], target: ESocketRole, proxy) -> object:
-        if len(args) == 1:
-            print(self.getHelpText(args[0]))
-            return "Syntax error."
-
-        userInput = ' '.join(args[1:])
-
-        pkt = str.encode(userInput, 'utf-8')
-        pkt = self.escape(pkt)
-        if proxy.connected:
-            proxy.sendData(target, pkt)
-            return 0
-        return "Not connected."
-
-    def cmd_sf(self, args: list[str], proxy) -> object:
-        return self.cmd_send_file(args, ESocketRole.server, proxy)
-
-    def cmd_cf(self, args: list[str], proxy) -> object:
-        return self.cmd_send_file(args, ESocketRole.client, proxy)
-
-    def cmd_send_file(self, args: list[str], target: ESocketRole, proxy) -> object:
-        if len(args) != 2:
-            print(self.getHelpText(args[0]))
-            return "Syntax error."
-        
-        filePath = ' '.join(args[1:])
-        if not os.path.isfile(filePath):
-            return f"File \"{filePath}\" does not exist."
-        
-        byteArray = b''
-        try:
-            with open(filePath, "rb") as file:
-                while byte := file.read(1):
-                    byteArray += byte
-        # pylint: disable=broad-except
-        except Exception as e:
-            return f"Error reading file \"{filePath}\": {e}"
-
-        if proxy.connected:
-            proxy.sendData(target, byteArray)
-            return 0
-        return "Not connected."
-
-    def cmd_disconnect(self, args: list[str], proxy) -> object:
-        if len(args) != 1:
-            print(self.getHelpText(args[0]))
-            return "Syntax error."
-
-        if proxy.connected:
-            proxy.disconnect()
-            return 0
-        return "Not connected."
-
-    def cmd_lshistory(self, args: list[str], proxy) -> object:
+    def _cmd_lshistory(self, args: list[str], proxy) -> object:
         if len(args) > 2:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -303,7 +194,7 @@ class CoreParser():
         
         if len(args) == 2:
             try:
-                idx = self.strToInt(args[1])
+                idx = self._strToInt(args[1])
             except ValueError as e:
                 print(self.getHelpText(args[0]))
                 return f"Syntax error: {e}"
@@ -320,7 +211,7 @@ class CoreParser():
             print(f"{idx} - \"{historyline}\"")
         return 0
 
-    def cmd_clearhistory(self, args: list[str], proxy) -> object:
+    def _cmd_clearhistory(self, args: list[str], proxy) -> object:
         readline = self.application.getReadlineModule()
 
         if len(args) > 2:
@@ -329,7 +220,7 @@ class CoreParser():
 
         if len(args) == 2:
             try:
-                idx = self.strToInt(args[1])
+                idx = self._strToInt(args[1])
             except ValueError as e:
                 print(self.getHelpText(args[0]))
                 return f"Syntax error: {e}"
@@ -348,7 +239,7 @@ class CoreParser():
         readline.write_history_file(self.application.HISTORY_FILE)
         return 0
 
-    def cmd_lssetting(self, args: list[str], proxy) -> object:
+    def _cmd_lssetting(self, args: list[str], proxy) -> object:
         if len(args) > 2:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -377,55 +268,7 @@ class CoreParser():
             print(f"{keyNameStr}: {value}")
         return 0
 
-    def cmd_hexdump(self, args: list[str], proxy) -> object:
-        if len(args) > 4:
-            print(self.getHelpText(args[0]))
-            return "Syntax error."
-
-        enabled = self.getSetting(ECoreSettingKey.HEXDUMP_ENABLED)
-        hexdumpObj: Hexdump = self.getSetting(ECoreSettingKey.HEXDUMP)
-        bytesPerGroup = hexdumpObj.bytesPerGroup
-        bytesPerLine = hexdumpObj.bytesPerLine
-
-        if len(args) > 3:
-            try:
-                bytesPerGroup = self.strToInt(args[3])
-            except ValueError as e:
-                print(self.getHelpText(args[0]))
-                return f"Syntax error: {e}"
-        
-        if len(args) > 2:
-            try:
-                bytesPerLine = self.strToInt(args[2])
-                if bytesPerLine < 1:
-                    raise ValueError("Can't have less than 1 byte per line.")
-            except ValueError as e:
-                print(self.getHelpText(args[0]))
-                return f"Syntax error: {e}"
-        
-        if len(args) > 1:
-            if args[1].lower() == 'yes':
-                enabled = True
-            elif args[1].lower() == 'no':
-                enabled = False
-            else:
-                print(self.getHelpText(args[0]))
-                return "Syntax error: Must be 'yes' or 'no'."
-        
-        # Write back settings
-        self.setSetting(ECoreSettingKey.HEXDUMP_ENABLED, enabled, proxy)
-        hexdumpObj.setBytesPerLine(bytesPerLine)
-        hexdumpObj.setBytesPerGroup(bytesPerGroup)
-
-        # Show status
-        if enabled:
-            print(f"Printing hexdumps: {hexdumpObj}")
-        else:
-            print("Not printing hexdumps.")
-
-        return 0
-
-    def cmd_set(self, args: list[str], proxy) -> object:
+    def _cmd_set(self, args: list[str], proxy) -> object:
         if len(args) < 3:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -440,7 +283,7 @@ class CoreParser():
         self.application.setVariable(varName, varValue)
         return 0
 
-    def cmd_unset(self, args: list[str], proxy) -> object:
+    def _cmd_unset(self, args: list[str], proxy) -> object:
         if len(args) != 2:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -451,7 +294,7 @@ class CoreParser():
             return f"Variable {args[1]} doesn't exist."
         return 0
 
-    def cmd_lsvars(self, args: list[str], proxy) -> object:
+    def _cmd_lsvars(self, args: list[str], proxy) -> object:
         if len(args) > 2:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -478,7 +321,7 @@ class CoreParser():
             print(f"{varName.rjust(maxVarNameLength)} - \"{varValue}\"")
         return 0
 
-    def cmd_savevars(self, args: list[str], proxy) -> object:
+    def _cmd_savevars(self, args: list[str], proxy) -> object:
         if len(args) != 2:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -494,7 +337,7 @@ class CoreParser():
 
         return 0
 
-    def cmd_loadvars(self, args: list[str], proxy) -> object:
+    def _cmd_loadvars(self, args: list[str], proxy) -> object:
         if len(args) != 2:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -539,7 +382,7 @@ class CoreParser():
 
         return 0
 
-    def cmd_clearvars(self, args: list[str], proxy) -> object:
+    def _cmd_clearvars(self, args: list[str], proxy) -> object:
         if len(args) != 1:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -547,14 +390,14 @@ class CoreParser():
         print("All variables deleted.")
         return 0
 
-    def cmd_pack(self, args: list[str], proxy) -> object:
+    def _cmd_pack(self, args: list[str], proxy) -> object:
         # FIXME: cstring and pascal string not working correctly.
         if len(args) < 4:
             print(self.getHelpText(args[0]))
             return "Syntax error."
         
-        formatMapping = self.aux_pack_getFormatMapping()
-        dataTypeMapping = self.aux_pack_getDataTypeMapping()
+        formatMapping = self._aux_pack_getFormatMapping()
+        dataTypeMapping = self._aux_pack_getDataTypeMapping()
 
         dataCount = len(args) - 3 # Data is separated by spaces
 
@@ -575,7 +418,7 @@ class CoreParser():
         # Convert data according to the format
         convertedData = []
         for dataStr in dataStrArray:
-            data = self.aux_pack_convert(dataTypeMapping[dataTypeMappingString], dataStr)
+            data = self._aux_pack_convert(dataTypeMapping[dataTypeMappingString], dataStr)
             convertedData.append(data)
         try:
             packedValues = struct.pack(formatString, *convertedData)
@@ -589,13 +432,13 @@ class CoreParser():
         print(f"Hex: {asHex}")
         return 0
 
-    def cmd_unpack(self, args: list[str], proxy) -> object:
+    def _cmd_unpack(self, args: list[str], proxy) -> object:
         if len(args) < 4:
             print(self.getHelpText(args[0]))
             return "Syntax error."
         
-        formatMapping = self.aux_pack_getFormatMapping()
-        dataTypeMapping = self.aux_pack_getDataTypeMapping()
+        formatMapping = self._aux_pack_getFormatMapping()
+        dataTypeMapping = self._aux_pack_getDataTypeMapping()
         
         dataTypeMappingString = args[1]
         if dataTypeMappingString not in dataTypeMapping:
@@ -628,19 +471,19 @@ class CoreParser():
         return 0
 
     # Converts the string data from the user's input into the correct data type for struct.pack
-    def aux_pack_convert(self, dataTypeString: str, dataStr: str) -> object:
+    def _aux_pack_convert(self, dataTypeString: str, dataStr: str) -> object:
         if dataTypeString in ['c', 's', 'p']:
             # byte array formats
             return bytes.fromhex(dataStr)
         if dataTypeString in ['b', 'B', 'h', 'H', 'i', 'I', 'l', 'L', 'q', 'Q', 'n', 'N', 'P']:
             # integer formats
-            return self.strToInt(dataStr)
+            return self._strToInt(dataStr)
         if dataTypeString in ['e', 'f', 'd']:
             # float formats
             return float(dataStr)
         raise ValueError(f"Format string {dataTypeString} unknown.")
 
-    def aux_pack_getFormatMapping(self) -> dict:
+    def _aux_pack_getFormatMapping(self) -> dict:
         mapping = {
             'native': '@',
             'standard_size': '=',
@@ -656,7 +499,7 @@ class CoreParser():
 
         return mapping
 
-    def aux_pack_getDataTypeMapping(self) -> dict:
+    def _aux_pack_getDataTypeMapping(self) -> dict:
         mapping = {
             'byte': 'c',
             'char': 'b',
@@ -687,7 +530,7 @@ class CoreParser():
 
         return mapping
 
-    def cmd_convert(self, args: list[str], proxy) -> object:
+    def _cmd_convert(self, args: list[str], proxy) -> object:
         if len(args) not in [2, 3]:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -712,7 +555,7 @@ class CoreParser():
                 return f"Can't convert {numberString} as {formatString} to number: {e}"
         else:
             numberString = args[1]
-            number = self.strToInt(numberString)
+            number = self._strToInt(numberString)
         # print the number
         print(f"DEC: {number}\nHEX: {hex(number)}\nOCT: {oct(number)}\nBIN: {bin(number)}")
         return 0
@@ -720,29 +563,21 @@ class CoreParser():
     ###############################################################################
     # Completers go here.
 
-    def yesNoCompleter(self) -> None:
-        options = ["yes", "no"]
-        for option in options:
-            if option.startswith(self.completer.being_completed):
-                self.completer.candidates.append(option)
-        return
-
-    def convertTypeCompleter(self) -> None:
+    def _convertTypeCompleter(self) -> None:
         options = ['dec', 'bin', 'oct', 'hex']
         for option in options:
             if option.startswith(self.completer.being_completed):
                 self.completer.candidates.append(option)
         return
 
-
-    def packDataTypeCompleter(self) -> None:
+    def _packDataTypeCompleter(self) -> None:
         options = self.aux_pack_getDataTypeMapping().keys()
         for option in options:
             if option.startswith(self.completer.being_completed):
                 self.completer.candidates.append(option)
         return
 
-    def packFormatCompleter(self) -> None:
+    def _packFormatCompleter(self) -> None:
         formatMapping = self.aux_pack_getFormatMapping()
         dataTypeMapping = self.aux_pack_getDataTypeMapping()
         # 'n' and 'N' only available in native.
@@ -761,29 +596,78 @@ class CoreParser():
                 self.completer.candidates.append(option)
         return
 
-    def commandCompleter(self) -> None:
-        self.completer.getCommandCandidates()
+    def _commandCompleter(self) -> None:
+        self.completer.candidates.extend( [
+                s
+                for s in self.commandDictionary.keys()
+                if s and s.startswith(self.completer.being_completed)
+            ]
+        )
         return
 
-    def fileCompleter(self) -> None:
-        self.completer.getFileCandidates()
+    def _fileCompleter(self) -> None:
+        # FIXME: fix completion for paths with spaces
+
+        # Append candidates for files
+        # Find which word we are current completing
+        # This is the space separated word, being_completed would start at the last '/'
+        word = self.completer.words[self.completer.getWordIdx()]
+
+        # Find which directory we are in
+        directory = "./"
+        filenameStart = ""
+        if word:
+            # There is at least some text being completed.
+            if word.find("/") >= 0:
+                # There is a path delimiter in the string, we need to assign the directory and the filename start both.
+                directory = word[:word.rfind("/")] + "/"
+                filenameStart = word[word.rfind("/") + 1:]
+            else:
+                # There is no path delimiters in the string. We're only searching the current directory for the file name.
+                filenameStart = word
+
+        # Find all files and directories in that directory
+        if os.path.isdir(directory):
+            files = os.listdir(directory)
+            # Find which of those files matches the end of the path
+            for file in files:
+                if os.path.isdir(os.path.join(directory, file)):
+                    file += "/"
+                if file.startswith(filenameStart):
+                    self.completer.candidates.append(file)
         return
 
-    def settingsCompleter(self) -> None:
-        self.completer.getSettingsCandidates()
+    def _settingsCompleter(self) -> None:
+        for settingName in [x.name for x in self.getSettingKeys()]:
+            if settingName.startswith(self.completer.being_completed):
+                self.completer.candidates.append(settingName)
         return
 
-    def variableCompleter(self) -> None:
+    def _variableCompleter(self) -> None:
         self.completer.getVariableCandidates(False)
         return
 
-    def historyCompleter(self) -> None:
-        self.completer.getHistoryCandidates()
+    def _historyCompleter(self) -> None:
+        # Get candidates from the history
+        history = [self.completer.readline.get_history_item(i) for i in range(0, self.completer.readline.get_current_history_length())]
+        for historyline in history:
+            if historyline is None or historyline == "":
+                continue
+            
+            # Get the whole line.
+            if historyline.startswith(self.completer.origline):
+                # Must only append to the part that is currently being completed
+                # otherwise the whole line may be added again.
+                self.completer.candidates.append(historyline[self.completer.begin:])
+            
         return
 
-    def proxyNameCompleter(self) -> None:
-        self.completer.getProxyNameCandidates()
+    def _proxyNameCompleter(self) -> None:
+        for proxyName in self.application.proxies:
+            if proxyName.startswith(self.completer.being_completed):
+                self.completer.candidates.append(proxyName)
         return
+
     ###############################################################################
     # No need to edit the functions below
 
@@ -810,14 +694,14 @@ class CoreParser():
             return helpText
 
     # replaces escape sequences with the proper values
-    def escape(self, data: bytes) -> bytes:
+    def _escape(self, data: bytes) -> bytes:
         idx = 0
         newData = b''
         while idx < len(data):
-            b = self.intToByte(data[idx])
+            b = self._intToByte(data[idx])
             if b == b'\\':
                 idx += 1 # Add one to the index so we don't read the escape sequence byte as a normal byte.
-                nextByte = self.intToByte(data[idx]) # May throw IndexError, pass it up to the user.
+                nextByte = self._intToByte(data[idx]) # May throw IndexError, pass it up to the user.
                 if nextByte == b'\\':
                     newData += b'\\'
                 elif nextByte == b'n':
@@ -840,7 +724,7 @@ class CoreParser():
                 elif ord(nextByte) in range(ord(b'0'), ord(b'7') + 1):
                     octalBytes = data[idx:idx+3]
                     num = int(octalBytes, 7)
-                    newData += self.intToByte(num)
+                    newData += self._intToByte(num)
                     idx += 2 # skip 2 more bytes
                     
                 elif nextByte == b'u':
@@ -857,10 +741,10 @@ class CoreParser():
             idx += 1
         return newData
 
-    def intToByte(self, i: int) -> bytes:
-        return struct.pack('=b', i if i < 128 else i - 256)
+    def _intToByte(self, i: int) -> bytes:
+        return struct.pack('=B', i)
 
-    def strToInt(self, dataStr: str) -> int:
+    def _strToInt(self, dataStr: str) -> int:
         if dataStr.startswith('0x'):
             return int(dataStr[2:], 16)
         if dataStr.startswith('x'):

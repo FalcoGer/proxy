@@ -254,14 +254,10 @@ class SocketHandler(Thread):
     def run(self) -> None:
         if self.sock is None:
             raise RuntimeError('Socket has expired. Can not start again after shutdown.')
-        self.lock.acquire()
-        self.running = True
-        self.lock.release()
+        with self.lock:
+            self.running = True
         localRunning = True
         while localRunning:
-            self.lock.acquire()
-            localRunning = self.running
-            self.lock.release()
             # Receive data from the host.
             data = False
             abort = False
@@ -308,6 +304,9 @@ class SocketHandler(Thread):
             # Sleep if we didn't get any data or if we didn't send
             if not data and (queueEmpty or not readyToWrite):
                 sleep(0.001)
+            
+            with self.lock:
+                localRunning = self.running
         
         # Stopped, clean up socket.
         # Send all remaining messages.

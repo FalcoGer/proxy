@@ -1,4 +1,3 @@
-import os
 import traceback
 
 class Completer():
@@ -15,7 +14,8 @@ class Completer():
         self.wordIdx = 0            # The index of the current word in the buffer
         
         self.candidates = []        # Functions append strings that would complete the current word here.
-
+    
+    # pylint: disable=unused-argument
     def complete(self, text: str, state: int) -> str:
         response = None
         try:
@@ -40,8 +40,10 @@ class Completer():
                     # completing variable
                     self.getVariableCandidates(True)
                 elif self.wordIdx == 0:
-                    # Completing arguments
-                    self.getCommandCandidates()
+                    # Completing commands
+                    for cmd in cmdDict:
+                        if cmd.startswith(self.being_completed):
+                            self.candidates.append(cmd)
                 else:
                     # Completing command argument
                     if self.words[0] not in cmdDict.keys():
@@ -81,35 +83,12 @@ class Completer():
                     response = self.readline.get_history_item(histIdx)
             except IndexError:
                 response = None
+        # pylint: disable=broad-except
         except Exception as e:
             print(e)
             print(traceback.format_exc())
         
         return response
-
-    def getCommandCandidates(self) -> None:
-        self.candidates.extend( [
-                s
-                for s in self.parser.commandDictionary.keys()
-                if s and s.startswith(self.being_completed)
-            ]
-        )
-        return
-
-    def getHistoryCandidates(self) -> None:
-        # Get candidates from the history
-        history = [self.readline.get_history_item(i) for i in range(0, self.readline.get_current_history_length())]
-        for historyline in history:
-            if historyline is None or historyline == "":
-                continue
-            
-            # Get the whole line.
-            if historyline.startswith(self.origline):
-                # Must only append to the part that is currently being completed
-                # otherwise the whole line may be added again.
-                self.candidates.append(historyline[self.begin:])
-            
-        return
     
     def getHistIdxCandidates(self, includePrefix: bool) -> None:
         # Complete possible values only if there is not a complete match.
@@ -148,52 +127,10 @@ class Completer():
         return
     
     def getVariableCandidates(self, includePrefix: bool) -> None:
+        # TODO: allow for $(varname) format also
         for variableName in self.application.variables.keys():
             if (("$" if includePrefix else "") + variableName).startswith(self.being_completed):
                 self.candidates.append(("$" if includePrefix else "") + variableName)
-        return
-
-    def getSettingsCandidates(self) -> None:
-        for settingName in [x.name for x in self.parser.getSettingKeys()]:
-            if settingName.startswith(self.being_completed):
-                self.candidates.append(settingName)
-        return
-
-    def getFileCandidates(self) -> None:
-        # FIXME: fix completion for paths with spaces
-        
-        # Append candidates for files
-        # Find which word we are current completing
-        word = self.words[self.getWordIdx()]
-        
-        # Find which directory we are in
-        directory = "./"
-        filenameStart = ""
-        if word:
-            # There is at least some text being completed.
-            if word.find("/") >= 0:
-                # There is a path delimiter in the string, we need to assign the directory and the filename start both.
-                directory = word[:word.rfind("/")] + "/"
-                filenameStart = word[word.rfind("/") + 1:]
-            else:
-                # There is no path delimiters in the string. We're only searching the current directory for the file name.
-                filenameStart = word
-                
-        # Find all files and directories in that directory
-        if os.path.isdir(directory):
-            files = os.listdir(directory)
-            # Find which of those files matches the end of the path
-            for file in files:
-                if os.path.isdir(os.path.join(directory, file)):
-                    file += "/"
-                if file.startswith(filenameStart):
-                    self.candidates.append(file)
-        return
-
-    def getProxyNameCandidates(self) -> None:
-        for proxyName in self.application.proxies:
-            if proxyName.startswith(self.being_completed):
-                self.candidates.append(proxyName)
         return
 
     def getWordIdx(self) -> int:

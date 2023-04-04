@@ -1,3 +1,5 @@
+# This file contains the user defined parser commands and functionality
+
 # struct is used to decode bytes into primitive data types
 # https://docs.python.org/3/library/struct.html
 import struct
@@ -6,13 +8,13 @@ from enum import Enum, auto
 # Allows pretty printing of bytes in a hexdump format
 from hexdump import Hexdump
 
-# import helper functions from core parser
-from core_parser import CoreParser as BaseParser
+# This is the base class for the custom parser class
+from base_parser import BaseParser
 
 # import stuff for API calls
 from eSocketRole import ESocketRole
 
-# For more examples of commands, completers and api calls check core parser file.
+# For more examples of commands, completers and api calls check core and base parser file.
 
 ###############################################################################
 # Setting storage stuff goes here.
@@ -44,11 +46,11 @@ class ESettingKey(Enum):
 class CustomParser(BaseParser):
     # Use this to set sensible defaults for your stored variables.
     def getDefaultSettings(self) -> dict[(Enum, object)]:
-        coreDefaultSettings = super().getDefaultSettings()
+        defaultSettings = super().getDefaultSettings()
         userDefaultSettings = {
                 ESettingKey.EXAMPLE_SETTING: 'ExAmPlE'
             }
-        return coreDefaultSettings | userDefaultSettings
+        return defaultSettings | userDefaultSettings
 
     ###############################################################################
     # Packet parsing stuff goes here.
@@ -90,7 +92,7 @@ class CustomParser(BaseParser):
         ret = super().buildCommandDict()
         
         # Add your custom commands here
-        ret['example']      = (self.cmd_example, 'Sends the string in the example setting n times to the client.\nUsage: {0} [upper | lower | as_is] count\nExample {0} as_is 10.', [self.exampleCompleter, self.historyCompleter, None])
+        ret['example']      = (self._cmd_example, 'Sends the string in the example setting n times to the client.\nUsage: {0} [upper | lower | as_is] count\nExample {0} as_is 10.', [self._exampleCompleter, self._historyCompleter, None])
         # Alises
         ret['ex']           = ret['example']
         return ret
@@ -98,9 +100,9 @@ class CustomParser(BaseParser):
     ###############################################################################
     # Command callbacks go here.
 
-    def cmd_example(self, args: list[str], proxy) -> object:
+    def _cmd_example(self, args: list[str], proxy) -> object:
         if len(args) != 3:
-            print(self.getHelpText(args[0]))
+            print(self._getHelpText(args[0]))
             return "Syntax error."
         
         dataStr = str(self.getSetting(ESettingKey.EXAMPLE_SETTING))
@@ -115,7 +117,7 @@ class CustomParser(BaseParser):
             print(self.getHelpText(args[0]))
             return f"Capitalize must be 'upper', 'lower' or 'as_is', but was {args[1]}"
         
-        count = self.strToInt(args[2]) # this allows hex, bin and oct notations also
+        count = self._strToInt(args[2]) # this allows hex, bin and oct notations also
         data = dataStr.encode('utf-8')
         
         # xmit count times
@@ -132,7 +134,7 @@ class CustomParser(BaseParser):
     # See proxy.py for which values are available in the completer object.
     # Append any options you want to be in the auto completion list to completer.candidates
 
-    def exampleCompleter(self) -> None:
+    def _exampleCompleter(self) -> None:
         options = ["upper", "lower", "as_is"]
         for option in options:
             if option.startswith(self.completer.being_completed):
