@@ -15,7 +15,13 @@ Do:
         REF: imp module!
         REF: https://www.geeksforgeeks.org/how-to-dynamically-load-modules-or-classes-in-python/
     reload them even if currently selected proxy doesn't use them
+    parser container class that stores the module parser and offers functions to reload
+        __init__(moduleName)
+        type checking with isinstance()? maybe impossible or only via black magic.
+        update getParser functions in application
+        update default parser to be base parser
     command loadparser filename
+    use core parser if no proxies exist
 
 - make a better check for when to reload the Parser module in application.py
 
