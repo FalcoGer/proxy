@@ -29,12 +29,8 @@ Do:
 
 - allow selecting proxies by binding port
 
-- move the proxy into it's own repo and make it a submodule here
-    REF: https://stackoverflow.com/questions/17413493/create-a-submodule-repository-from-a-folder-and-keep-its-git-commit-history
-
 - make internal variables and functions private with _
     provide getters and setters with proper checks
-
 
 Fix:
 - Latest command not part of history
