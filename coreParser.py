@@ -6,7 +6,7 @@ from enum import Enum, auto
 from copy import copy
 
 from eSocketRole import ESocketRole
-from hexdump import hexdump
+from hexdump import Hexdump
 from completer import Completer
 
 ###############################################################################
@@ -14,11 +14,7 @@ from completer import Completer
 
 class ECoreSettingKey(Enum):
     HEXDUMP_ENABLED             = auto()
-    HEXDUMP_BYTES_PER_LINE      = auto()
-    HEXDUMP_BYTES_PER_GROUP     = auto()
-    HEXDUMP_PRINT_HIGH_ASCII    = auto()
-    HEXDUMP_NON_PRINTABLE_CHAR  = auto()
-    
+    HEXDUMP                     = auto()
     PACKETNOTIFICATION_ENABLED  = auto()
 
     def __eq__(self, other) -> bool:
@@ -40,13 +36,23 @@ class ECoreSettingKey(Enum):
         raise ValueError("Can not compare.")
 
     def __hash__(self):
-    	return int.__hash__(self.value)
+        return self.value.__hash__()
 
 class CoreParser():
-    def __init__(self, application):
+    def __init__(self, application, settings: dict[(Enum, object)]):
         self.application = application
         self.completer = Completer(application, self)
         self.commandDictionary = self.buildCommandDict()
+
+        # Populate settings
+        self.settings = settings
+        # If a setting is not set, it shall be set now
+        for settingKey in self.getSettingKeys():
+            if settingKey not in self.settings:
+                self.settings[settingKey] = self.getDefaultSettings()[settingKey]
+        # Remove any settings that are no longer in the list
+        for settingKey in list(filter(lambda settingKey: settingKey not in self.getSettingKeys(), self.settings.keys())):
+            self.settings.pop(settingKey) 
 
     def getSettingKeys(self) -> list[Enum]:
         return list(ECoreSettingKey)
@@ -54,21 +60,24 @@ class CoreParser():
     def getDefaultSettings(self) -> dict[(Enum, object)]:
         return {
                 ECoreSettingKey.HEXDUMP_ENABLED: True,
+                ECoreSettingKey.HEXDUMP: Hexdump(),
                 ECoreSettingKey.PACKETNOTIFICATION_ENABLED: True,
-                ECoreSettingKey.HEXDUMP_BYTES_PER_LINE: 16,
-                ECoreSettingKey.HEXDUMP_BYTES_PER_GROUP: 4,
-                ECoreSettingKey.HEXDUMP_PRINT_HIGH_ASCII: False,
-                ECoreSettingKey.HEXDUMP_NON_PRINTABLE_CHAR: '.'
             }
 
-    def getSetting(self, settingKey: Enum, proxy) -> object:
-        settingValue = proxy.settings.get(settingKey)
+    def getSetting(self, settingKey: Enum) -> object:
+        if settingKey not in self.getSettingKeys():
+            raise IndexError(f'Setting Key {settingKey} was not found.')
+        settingValue = self.settings.get(settingKey, None)
         if settingValue is None:
-            settingValue = self.getDefaultSettings().get(settingKey)
+            # This should throw is the key is not in the default settings.
+            settingValue = self.getDefaultSettings().get(settingKey, None)
+            self.settings[settingKey] = settingValue
         return settingValue
 
     def setSetting(self, settingKey: Enum, settingValue: object, proxy) -> None:
-        proxy.settings[settingKey] = settingValue
+        if settingKey not in self.getSettingKeys():
+            raise IndexError(f'Setting Key {settingKey} was not found.')
+        self.settings[settingKey] = settingValue
         return
 
     ###############################################################################
@@ -76,26 +85,15 @@ class CoreParser():
 
     # Define what should happen when a packet arrives here
     def parse(self, data: bytes, proxy, origin: ESocketRole) -> None:
-        if self.getSetting(ECoreSettingKey.PACKETNOTIFICATION_ENABLED, proxy):
+        if self.getSetting(ECoreSettingKey.PACKETNOTIFICATION_ENABLED):
             # Print out the data in a nice format.
-            sh, sp = proxy.getClient() if origin == ESocketRole.client else proxy.getServer()
-            dh, dp = proxy.getServer() if origin == ESocketRole.client else proxy.getClient()
-            srcStr = f"{sh}:{sp}"
-            destStr = f"{dh}:{dp}"
-            maxLen = len(srcStr) if len(srcStr) > len(destStr) else len(destStr)
-
-            srcStr = srcStr.rjust(maxLen)
-            destStr = destStr.ljust(maxLen)
             directionStr = "C -> S" if origin == ESocketRole.client else "C <- S"
-            print(f"[{directionStr}] - {srcStr}->{destStr} ({len(data)} Byte{'s' if len(data) > 1 else ''})")
+            print(f"[{directionStr}] - {proxy} ({len(data)} Byte{'s' if len(data) > 1 else ''})")
 
-        if self.getSetting(ECoreSettingKey.HEXDUMP_ENABLED, proxy):
-            bytesPerLine = self.getSetting(ECoreSettingKey.HEXDUMP_BYTES_PER_LINE, proxy)
-            bytesPerGroup = self.getSetting(ECoreSettingKey.HEXDUMP_BYTES_PER_GROUP, proxy)
-            sep = self.getSetting(ECoreSettingKey.HEXDUMP_NON_PRINTABLE_CHAR, proxy)
-            printHighAscii = self.getSetting(ECoreSettingKey.HEXDUMP_PRINT_HIGH_ASCII, proxy)
-            hd = "\n".join(hexdump(data, bytesPerLine, bytesPerGroup, None, sep, printHighAscii))
-            print(f"{hd}")
+        if self.getSetting(ECoreSettingKey.HEXDUMP_ENABLED):
+            hexdumpObj = self.getSetting(ECoreSettingKey.HEXDUMP)
+            hexdumpLines = "\n".join(hexdumpObj.hexdump(data))
+            print(f"{hexdumpLines}")
         return
 
     ###############################################################################
@@ -105,7 +103,7 @@ class CoreParser():
     # 1. args: list[str]
     #   A list of command arguments. args[0] is always the command string itself.
     # 2. proxy: Proxy
-    #   This allows to make calls to the proxy API, for example to inject packets or get settings.
+    #   This allows to make calls to the proxy API, for example to inject packets.
     # The functions should return 0 if they succeeded. Otherwise their return gets printed by the CLI handler.
 
     # Define which commands are available here and which function is called when it is entered by the user.
@@ -117,7 +115,7 @@ class CoreParser():
         ret = {}
         ret['help']         = (self.cmd_help, 'Print available commands. Or the help of a specific command.\nUsage: {0} [command]', [self.commandCompleter, None])
         ret['quit']         = (self.cmd_quit, 'Stop the proxy and quit.\nUsage: {0}', None)
-        ret['select']       = (self.cmd_select, 'Select a different proxy to give commands to.\nUsage: {0} ID\nNote: Use \"lsproxy\" to figure out the ID.', [self.historyCompleter, None])
+        ret['select']       = (self.cmd_select, 'Select a different proxy to give commands to.\nUsage: {0} ID\nNote: Use \"lsproxy\" to figure out the ID.', [self.proxyNameCompleter, None])
         ret['lsproxy']      = (self.cmd_lsproxy, 'Display all configured proxies and their status.\nUsage: {0}', None)
         ret['clearhistory'] = (self.cmd_clearhistory, 'Clear the command history or delete one entry of it.\nUsage: {0} [historyIndex].\nNote: The history file will instantly be overwritten.', None)
         ret['lshistory']    = (self.cmd_lshistory, 'Show the command history or display one entry of it.\nUsage: {0} [historyIndex]', None)
@@ -168,7 +166,7 @@ class CoreParser():
         
         # Print
         # Find the longest key for neat formatting.
-        maxLen = max([len(key) for key in self.commandDictionary.keys()])
+        maxLen = max(len(key) for key in self.commandDictionary)
 
         for key in self.commandDictionary:
             helpText = self.getHelpText(key)
@@ -191,28 +189,21 @@ class CoreParser():
             return "Syntax error."
         
         try:
-            proxyId = self.strToInt(args[1])
-        except ValueError as e:
-            print(self.getHelpText(args[0]))
-            return f"Syntax error: {e}"
-        
-        try:
-            self.application.selectProxy(proxyId)
+            self.application.selectProxy(args[1])
         except IndexError as e:
-            return f"{e}"
+            return f"Unable to select proxy {args[1]}: {e}"
         
         return 0
 
     def cmd_lsproxy(self, args: list[str], proxy) -> object:
+        if len(args) > 1:
+            print(self.getHelpText(args[0]))
+            return "Syntax error."
+
         idx = 0
-        idxStrLen = len(str(len(self.application.proxyList) - 1))
-        identStrLen = max(len(proxy.identifier) for proxy in self.application.proxyList)
         
-        for proxy in self.application.proxyList:
-            idxStr = str(idx).rjust(idxStrLen)
-            identStr = proxy.identifier.ljust(identStrLen)
-            status = 'Connected' if proxy.running else 'Listening'
-            print(f'[{idxStr}] - {identStr} - {status}')
+        for p in self.application.proxies.values():
+            print(f'[{idx}] - {p}')
             idx += 1
         return 0
 
@@ -238,7 +229,7 @@ class CoreParser():
         userInput = ''.join(args[1:])
             
         pkt = bytes.fromhex(userInput)
-        if proxy.running:
+        if proxy.connected:
             proxy.sendData(target, pkt)
             return 0
         return "Not connected."
@@ -258,7 +249,7 @@ class CoreParser():
 
         pkt = str.encode(userInput, 'utf-8')
         pkt = self.escape(pkt)
-        if proxy.running:
+        if proxy.connected:
             proxy.sendData(target, pkt)
             return 0
         return "Not connected."
@@ -286,7 +277,7 @@ class CoreParser():
         except Exception as e:
             return f"Error reading file \"{filePath}\": {e}"
 
-        if proxy.running:
+        if proxy.connected:
             proxy.sendData(target, byteArray)
             return 0
         return "Not connected."
@@ -296,7 +287,7 @@ class CoreParser():
             print(self.getHelpText(args[0]))
             return "Syntax error."
 
-        if proxy.running:
+        if proxy.connected:
             proxy.disconnect()
             return 0
         return "Not connected."
@@ -371,16 +362,16 @@ class CoreParser():
             for settingKey in self.getSettingKeys():
                 if settingKey.name == args[1]:
                     break
-            value = self.getSetting(settingKey, proxy)
+            value = self.getSetting(settingKey)
             print(f"{settingKey.name}: {value}")
             return 0
         
         # Print them all
-        longestKeyLength = max([len(str(x)) for x in self.getSettingKeys()])
+        longestKeyLength = max(len(str(x)) for x in self.getSettingKeys())
 
         for key in self.getSettingKeys():
             keyNameStr = str(key).rjust(longestKeyLength)
-            value = self.getSetting(key, proxy)
+            value = self.getSetting(key)
             print(f"{keyNameStr}: {value}")
         return 0
 
@@ -389,9 +380,10 @@ class CoreParser():
             print(self.getHelpText(args[0]))
             return "Syntax error."
 
-        enabled = self.getSetting(ECoreSettingKey.HEXDUMP_ENABLED, proxy)
-        bytesPerLine = self.getSetting(ECoreSettingKey.HEXDUMP_BYTES_PER_LINE, proxy)
-        bytesPerGroup = self.getSetting(ECoreSettingKey.HEXDUMP_BYTES_PER_GROUP, proxy)
+        enabled = self.getSetting(ECoreSettingKey.HEXDUMP_ENABLED)
+        hexdumpObj: Hexdump = self.getSetting(ECoreSettingKey.HEXDUMP)
+        bytesPerGroup = hexdumpObj.bytesPerGroup
+        bytesPerLine = hexdumpObj.bytesPerLine
 
         if len(args) > 3:
             try:
@@ -420,12 +412,12 @@ class CoreParser():
         
         # Write back settings
         self.setSetting(ECoreSettingKey.HEXDUMP_ENABLED, enabled, proxy)
-        self.setSetting(ECoreSettingKey.HEXDUMP_BYTES_PER_LINE, bytesPerLine, proxy)
-        self.setSetting(ECoreSettingKey.HEXDUMP_BYTES_PER_GROUP, bytesPerGroup, proxy)
+        hexdumpObj.setBytesPerLine(bytesPerLine)
+        hexdumpObj.setBytesPerGroup(bytesPerGroup)
 
         # Show status
         if enabled:
-            print(f"Printing hexdumps with {bytesPerLine} bytes per line and {bytesPerGroup} bytes per group.")
+            print(f"Printing hexdumps: {hexdumpObj}")
         else:
             print("Not printing hexdumps.")
 
@@ -604,11 +596,11 @@ class CoreParser():
         dataTypeMapping = self.aux_pack_getDataTypeMapping()
         
         dataTypeMappingString = args[1]
-        if dataTypeMappingString not in dataTypeMapping.keys():
+        if dataTypeMappingString not in dataTypeMapping:
             return f"Syntax error. Data type {dataTypeMappingString} unknown, must be one of {dataTypeMapping.keys()}."
         
         formatMappingString = args[2]
-        if formatMappingString not in formatMapping.keys():
+        if formatMappingString not in formatMapping:
             return f"Syntax error. Format {formatMappingString} unknown, must be one of {formatMapping.keys()}."
         
         if dataTypeMapping[dataTypeMappingString] in ['n', 'N'] and formatMapping[formatMappingString] != formatMapping['native']:
@@ -787,6 +779,9 @@ class CoreParser():
         self.completer.getHistoryCandidates()
         return
 
+    def proxyNameCompleter(self) -> None:
+        self.completer.getProxyNameCandidates()
+        return
     ###############################################################################
     # No need to edit the functions below
 
@@ -798,7 +793,7 @@ class CoreParser():
             # Ignore empty commands
             return 0
         
-        if args[0] not in self.commandDictionary.keys():
+        if args[0] not in self.commandDictionary:
             return f"Undefined command: \"{args[0]}\""
 
         function, _, _ = self.commandDictionary[args[0]]
@@ -869,13 +864,13 @@ class CoreParser():
         if dataStr.startswith('x'):
             return int(dataStr[1:], 16)
         if dataStr.startswith('0o'):
-            return (int(dataStr[2:], 8))
+            return int(dataStr[2:], 8)
         if (dataStr.startswith('0') and len(dataStr) > 1) or dataStr.startswith('o'):
             return int(dataStr[1:], 8)
         if dataStr.startswith('0b'):
-            return (int(dataStr[2:], 2))
+            return int(dataStr[2:], 2)
         if dataStr.startswith('b'):
-            return (int(dataStr[1:], 2))
+            return int(dataStr[1:], 2)
 
         return int(dataStr, 10)
 

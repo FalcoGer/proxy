@@ -79,14 +79,12 @@ class Completer():
                 if len(self.candidates) == 1 and response is not None and len(response) > 0 and response[0] == "!":
                     histIdx = int(response[1:])
                     response = self.readline.get_history_item(histIdx)
-            except IndexError as e:
+            except IndexError:
                 response = None
         except Exception as e:
             print(e)
             print(traceback.format_exc())
         
-        # print(f"Completion.\n  stage: {state}\n  response: {response}\n  candidates: {self.candidates}\n  being_completed: {self.being_completed}\n  origline: {self.origline}\n  start/end: {self.begin}/{self.end}\n")
-
         return response
 
     def getCommandCandidates(self) -> None:
@@ -125,7 +123,7 @@ class Completer():
             historyIdx = -1
             try:
                 historyIdx = int(self.being_completed[(1 if includePrefix else 0):])
-            except ValueError as e:
+            except ValueError:
                 pass
             
             # if there is a complete and valid (not None) match, return that match only.
@@ -190,6 +188,12 @@ class Completer():
                     file += "/"
                 if file.startswith(filenameStart):
                     self.candidates.append(file)
+        return
+
+    def getProxyNameCandidates(self) -> None:
+        for proxyName in self.application.proxies:
+            if proxyName.startswith(self.being_completed):
+                self.candidates.append(proxyName)
         return
 
     def getWordIdx(self) -> int:

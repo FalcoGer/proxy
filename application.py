@@ -11,7 +11,7 @@ except ImportError:
     import readline
 
 # This allows live reloading of modules
-from importlib import reload
+import importlib
 
 from proxy import Proxy
 import customParser as Parser
@@ -22,11 +22,10 @@ class Application():
         self.variables: dict[(str, str)] = {}
         self.running = True
         self.HISTORY_FILE = "history.log"
-        self.proxyList: list[Proxy] = []
-        self.selectedProxyIdx = 0
-        self.currentParser: Parser = Parser.CustomParser(self)
-
-    def main(self) -> None:
+        self.selectedProxyName: str = None
+        self.proxies: dict[(str, Proxy)] = {}
+        self.parsers: dict[(Proxy, Parser.CustomParser)] = {}
+        
         # parse command line arguments.
         arg_parser = argparse.ArgumentParser(description='Create multiple proxy connections. Provide multiple port parameters to create multiple proxies.')
         arg_parser.add_argument('-b', '--bind', required=False, help='Bind IP-address for the listening socket. Default \'0.0.0.0\'', default='0.0.0.0')
@@ -41,6 +40,10 @@ class Application():
         readline.set_auto_history(False)
         readline.set_history_length(512)
         # allow for completion of !<histIdx> and $<varname>
+        # readline.set_completer_delims(readline.get_completer_delims().replace("!", "").replace("$", ""))
+        readline.set_completer_delims(' /')
+        
+        # Try to load history file or create it if it doesn't exist.
         try:
             if os.path.exists(self.HISTORY_FILE):
                 readline.read_history_file(self.HISTORY_FILE)
@@ -49,42 +52,43 @@ class Application():
         except (PermissionError, FileNotFoundError, IsADirectoryError) as e:
             print(f"Can not read or create {self.HISTORY_FILE}: {e}")
 
-        # Create a proxy with, binding on all interfaces.
-        
-        localPorts = [x[0] for x in args.port]
-        remotePorts = [x[1] for x in args.port]
-        self.proxyList = [Proxy(self, args.bind, args.remote, *ports) for ports in zip(localPorts, remotePorts)]
-
-        for proxy in self.proxyList:
+        # Create a proxies and parsers based on arguments.
+        idx = 0
+        for localPort, remotePort in zip([x[0] for x in args.port], [x[1] for x in args.port]):
+            name = f'PROXY_{idx}'
+            proxy = Proxy(self, args.bind, args.remote, localPort, remotePort, name)
+            parser = Parser.CustomParser(self, {})
+            self.proxies[name] = proxy
+            self.parsers[proxy] = parser
             proxy.start()
-        
-        # readline.set_completer_delims(readline.get_completer_delims().replace("!", "").replace("$", ""))
-        readline.set_completer_delims(' /')
+            # Select the first proxy
+            if idx == 0:
+                self.selectProxy(name)
+            idx += 1
 
+    def main(self) -> None:
         # Accept user input and parse it.
         while self.running:
             try:
-                mustReload = True # TODO: make better check
-                if mustReload:
-                    reload(Parser)
-                    
-                    # Update parser
-                    self.currentParser = Parser.CustomParser(self)
+                for proxy, parser in self.parsers.items():
+                    mustReload = True # TODO: make better check
+                    if mustReload:
+                        # Save the settings before reloading
+                        parserSettings = parser.settings
+                        importlib.reload(Parser)
 
-                    # Update completer
-                    readline.set_completer(self.currentParser.completer.complete)
+                        # Create new parser with the old settings
+                        # TODO: create the same parser type as the last one
+                        newParser = Parser.CustomParser(self, parserSettings)
+                        self.parsers[proxy] = newParser
 
+                        # Reload completer if the new parser is the one in use.
+                        if self.getSelectedProxy() == proxy:
+                            readline.set_completer(newParser.completer.complete)
                 try:
                     print() # Empty line
                     cmd = None
-                    
-                    proxyIdxStrMaxLen = len(str(len(self.proxyList) - 1)) # kept here to keep it all in one place
-                    # Need to recalculate since proxy identifier may change due to reconnect
-                    proxyIdentStrMaxLen = max(len(proxy.identifier) for proxy in self.proxyList)
-                    
-                    proxyIdxStr = str(self.selectedProxyIdx).rjust(proxyIdxStrMaxLen)
-                    proxyIdentStr = self.getSelectedProxy().identifier.ljust(proxyIdentStrMaxLen)
-                    prompt = f'[{proxyIdxStr}] ({proxyIdentStr}) $ '
+                    prompt = self.getPromptString()                    
                     cmd = input(f'{prompt}')
                 except KeyboardInterrupt:
                     # Allow clearing the buffer with ctrl+c
@@ -94,64 +98,24 @@ class Application():
                 if cmd is None:
                     continue
 
-                expanded = False # Used to check if there is a need to print a modified command
-                
                 # Expand !<histIdx>
-                words = cmd.split(" ")
-                idx = 0
+                historyExpandedCmd = self.expandHistoryCommand(cmd)
                 
-                # Expand history substitution
-                for word in words:
-                    if word.startswith("!"):
-                        histIdx = int(word[1:]) # Let it throw ValueError to notify user.
-                        if not 0 <= histIdx < readline.get_current_history_length():
-                            raise ValueError("History index {histIdx} is out of range.")
-                        
-                        historyItem = readline.get_history_item(histIdx)
-                        if historyItem is None:
-                            raise ValueError("History index {histIdx} points to invalid history entry.")
-                        
-                        words[idx] = historyItem
-                        expanded = True
-                    idx += 1
-
-                # Save it to a different variable to save this modified command to the history.
-                # This is done to preserve the variable expansion later in the history.
-                historyExpandedCmd = ' '.join(words)
-
                 # Expand variable substitution
-                words = historyExpandedCmd.split(' ')
-                idx = 0
-                word = None
-                # On error set true, but add to history anyway.
-                # This is used to not send the command but add it to the history anyway.
-                doHandleCommand = True
                 try:
-                    for word in words:
-                        if word.startswith("$"):
-                            varname = word[1:]
-                            words[idx] = self.variables[varname] # Let it throw KeyError to notify user.
-                            expanded = True
+                    variableExpandedCmd = self.expandVariableCommand(cmd)
+                finally:
+                    # add to the history either way.
+                    self.addToHistory(historyExpandedCmd)
 
-                        idx += 1
-                except KeyError as e:
-                    print(f'Variable {word} does not exist: {e}')
-                    doHandleCommand = False
-                
-                # reassemble cmd
-                variableExpandedCmd = ' '.join(words)
+                escapedCmd = variableExpandedCmd.replace('\\!', '!').replace('\\$', '$') 
                 
                 # resolve escaped ! and $.
-                escapedCmd = variableExpandedCmd.replace('\\!', '!').replace('\\$', '$') 
-                if expanded or cmd != escapedCmd:
+                if cmd != escapedCmd:
                     print(f"Expanded: {escapedCmd}")
-                
-                self.addToHistory(historyExpandedCmd)
-                if not doHandleCommand:
-                    continue
                                 
                 # Handle the command
-                cmdReturn = self.currentParser.handleUserInput(escapedCmd, self.getSelectedProxy())
+                cmdReturn = self.getSelectedParser().handleUserInput(escapedCmd, self.getSelectedProxy())
                 if cmdReturn != 0:
                     print(f"Error: {cmdReturn}")
             except Exception as e:
@@ -159,14 +123,17 @@ class Application():
                 print(traceback.format_exc())
         
         # Save the history file.
-        for proxy in self.proxyList:
+        for proxy in self.proxies.values():
             proxy.shutdown()
 
-        for proxy in self.proxyList:
+        for proxy in self.proxies.values():
             proxy.join()
             
         readline.write_history_file(self.HISTORY_FILE)
         return
+
+    def getPromptString(self) -> str:
+        return f'[{self.getSelectedProxy()}] $ '
 
     def addToHistory(self, command: str) -> None:
         # FIXME: For some reason history completion is not available on the last item sent.
@@ -179,12 +146,29 @@ class Application():
         return
 
     def getSelectedProxy(self) -> Proxy:
-        return self.proxyList[self.selectedProxyIdx]
+        return self.getProxyByName(self.selectedProxyName)
 
-    def selectProxy(self, idx: int) -> None:
-        if not 0 <= idx < len(self.proxyList):
-            raise IndexError(f"Selected proxy index {idx} out of bounds.")
-        self.selectedProxyIdx = idx
+    def getSelectedParser(self) -> Parser.CustomParser:
+        proxy = self.getSelectedProxy()
+        return self.getParserByProxy(proxy)
+
+    def getProxyByName(self, name: str) -> Proxy:
+        return self.proxies[name]
+
+    def getParserByProxy(self, proxy: Proxy) -> Parser.CustomParser:
+        return self.parsers[proxy]
+
+    def getParserByProxyName(self, name: str) -> Parser.CustomParser:
+        proxy = self.getProxyByName(name)
+        return self.getParserByProxy(proxy)
+
+    def selectProxy(self, name: str) -> None:
+        if name not in self.proxies:
+            raise KeyError(f"{name} is not a valid proxy name.")
+        self.selectedProxyName = name
+        # reload the correct completer
+        readline.set_completer(self.getSelectedParser().completer.complete)
+        return
 
     def getVariable(self, variableName: str) -> str:
         if not self.checkVariableName(variableName):
@@ -211,22 +195,62 @@ class Application():
 
     def checkVariableName(self, variableName: str) -> bool:
         if len(variableName) == 0:
-            # Prevent nonsense
+            # Prevent empty variable names
             return False
-        if '$' in list(variableName):
-            # Prevent errors
-            return False
-        if '\\' in list(variableName):
-            # Prevent errors
-            return False
-        if ' ' in list(variableName):
-            # Prevent herrasy
-            return False
-        # Everything else is fine.
+
+        # Those are forbidden characters in the variable names
+        invalidChars = [' ', '$', '\\', '(', ')']
+        
+        # Check if they occur
+        for invalidChar in invalidChars:
+            if invalidChar in list(variableName):
+                return False
         return True
     
     def getReadlineModule(self):
         return readline
+
+    def expandHistoryCommand(self, cmd: str) -> str:
+        words = cmd.split(" ")
+        idx = 0
+
+        # Expand history substitution
+        for word in words:
+            if word.startswith("!"):
+                histIdx = int(word[1:]) # Let it throw ValueError to notify user.
+                if not 0 <= histIdx < readline.get_current_history_length():
+                    raise ValueError("History index {histIdx} is out of range.")
+                
+                historyItem = readline.get_history_item(histIdx)
+                if historyItem is None:
+                    raise ValueError("History index {histIdx} points to invalid history entry.")
+                
+                words[idx] = historyItem
+            idx += 1
+
+        # Save it to a different variable to save this modified command to the history.
+        # This is done to preserve the variable expansion later in the history.
+        historyExpandedCmd = ' '.join(words)
+        return historyExpandedCmd
+
+    def expandVariableCommand(self, cmd: str) -> str:
+        words = cmd.split(' ')
+        idx = 0
+        word = None
+        try:
+            for word in words:
+                if word.startswith("$"):
+                    varname = word[1:]
+                    words[idx] = self.variables[varname] # Let it throw KeyError to notify user.
+
+                idx += 1
+        except KeyError as e:
+            raise KeyError(f'Variable {word} does not exist: {e}') from e
+        
+        # reassemble cmd
+        variableExpandedCmd = ' '.join(words)
+        return variableExpandedCmd
+
 
 # Run
 if __name__ == '__main__':

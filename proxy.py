@@ -9,7 +9,7 @@ import select
 from queue import SimpleQueue
 
 # For creating multiple threads
-from threading import Thread
+from threading import Thread, Lock
 from time import sleep
 
 from eSocketRole import ESocketRole
@@ -17,22 +17,21 @@ from eSocketRole import ESocketRole
 # This is where users may do live edits and alter the behavior of the proxy.
 
 class Proxy(Thread):
-    def __init__(self, application, bindAddr: str, remoteAddr: str, localPort: int, remotePort: int):
+    def __init__(self, application, bindAddr: str, remoteAddr: str, localPort: int, remotePort: int, name: str):
         super().__init__()
         
         self.BIND_SOCKET_TIMEOUT = 3.0 # in seconds
 
         self.application = application
+        self.name = name
 
-        self.running = False
+        self.connected = False
         self.isShutdown = False
 
         self.bindAddr = bindAddr
         self.remoteAddr = remoteAddr
         self.localPort = localPort
         self.remotePort = remotePort
-        
-        self.identifier = f"{self.bindAddr}:{self.localPort} -> {self.remoteAddr}:{self.remotePort}"
         
         # Sockets
         self.bindSocket = None
@@ -41,11 +40,26 @@ class Proxy(Thread):
 
         self.bind(self.bindAddr, self.localPort)
         
-        # Proxy specific settings for parser
-        # They are saved here because the parser might be reloaded and
-        # anything stored there would be lost.
-        self.settings = {}
         return
+
+    def __str__(self):
+        ret = f"{self.name} ["
+        if self.isShutdown:
+            ret += 'DEAD]'
+            return ret
+
+        if not self.connected:
+            if self.client is not None:
+                ch, cp = self.getClient()
+                ret += f'C] {ch}:{cp}'
+            else:
+                ret += f'L] {self.bindAddr}:{self.localPort}'
+        else:
+            ch, cp = self.getClient()
+            ret += f'E] {ch}:{cp} (BP: {self.localPort})'
+        rh, rp = (self.remoteAddr, self.remotePort)
+        ret += f' - {rh}:{rp}'
+        return ret
 
     def run(self) -> None:
         # after client disconnected await a new client connection
@@ -57,27 +71,25 @@ class Proxy(Thread):
             
             # Client has connected.
             ch, cp = self.getClient()
-            self.identifier = f"{ch}:{cp} -> {self.remoteAddr}:{self.remotePort}"
-            print(f"[proxy({self.identifier})] Client connected.")
+            print(f"[{self}] Client connected: {ch}:{cp}")
             
             # Connect to the remote host after a client has connected.
             if not self.connect():
-                print(f'[proxy({self.identifier})] Could not connect to remote host.')
+                print(f'[{self}] Could not connect to remote host.')
+                self.client.start()
                 self.client.stop()
+                self.client.join()
                 self.client = None
                 continue
             
-            print(f'[proxy({self.identifier})] Connection established.')
+            print(f'[{self}]: Connection established.')
 
             # Start client and server socket handler threads.
             self.client.start()
             self.server.start()
             
-            self.running = True
-        return
-
-    def shutdown(self) -> None:
-        self.isShutdown = True
+            self.connected = True
+        # Shutdown
         if not self.client is None:
             self.client.stop()
             self.client.join()
@@ -86,6 +98,10 @@ class Proxy(Thread):
             self.server.stop()
             self.server.join()
             self.server = None
+        return
+
+    def shutdown(self) -> None:
+        self.isShutdown = True
         return
 
     def sendData(self, destination: ESocketRole, data: bytes) -> None:
@@ -112,9 +128,9 @@ class Proxy(Thread):
         if self.server is None:
             return (None, None)
         return (self.server.host, self.server.port)
-    
+
     def bind(self, host: str, port: int) -> None:
-        print(f"[proxy({self.identifier})] Starting listening socket on {host}:{port}")
+        print(f"[{self}] Starting listening socket on {host}:{port}")
         self.bindSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.bindSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.bindSocket.bind((host, port))
@@ -143,9 +159,9 @@ class Proxy(Thread):
         return True
     
     def connect(self) -> bool:
-        print(f"[proxy({self.identifier})] Connecting to {self.remoteAddr}:{self.remotePort}")
+        print(f"[{self}] Connecting to {self.remoteAddr}:{self.remotePort}")
         if self.server is not None:
-            raise RuntimeError(f"[proxy({self.identifier})] Already connected to remote host.")
+            raise RuntimeError(f"[{self}] Already connected to {self.server}.")
 
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -153,7 +169,7 @@ class Proxy(Thread):
             self.server = SocketHandler(sock, ESocketRole.server, self)
             return True
         except Exception as e:
-            print(f'[proxy({self.identifier})] Unable to connect to server {self.remoteAddr}:{self.remotePort}: {e}')
+            print(f'[{self}] Unable to connect to server {self.remoteAddr}:{self.remotePort}: {e}')
         return False
 
     def disconnect(self) -> None:
@@ -165,10 +181,7 @@ class Proxy(Thread):
             self.server.stop()
             self.server = None
 
-        self.running = False
-        
-        # Update Ident
-        self.identifier = f"{self.bindAddr}:{self.localPort} -> {self.remoteAddr}:{self.remotePort}"
+        self.connected = False
         
         return
 
@@ -194,6 +207,8 @@ class SocketHandler(Thread):
         # Set socket non-blocking. recv() will return if there is no data available.
         sock.setblocking(True)
 
+        self.lock = Lock()
+
     def send(self, data: bytes) -> None:
         self.dataQueue.put(data)
         return
@@ -206,7 +221,9 @@ class SocketHandler(Thread):
 
     def stop(self) -> None:
         # Cleanup of the socket is in the thread itself, in the run() function, to avoid the need for locks.
+        self.lock.acquire()
         self.running = False
+        self.lock.release()
         return
 
     def checkAlive(self) -> (bool, bool, bool):
@@ -225,13 +242,24 @@ class SocketHandler(Thread):
                 #print(f">>> Sending {len(message)} Bytes to {self.role.name}")
                 self.sock.sendall(message)
         except Exception as e:
-            print(f'[EXCEPT] - xmit data to {self.role.name} [{self.host}:{self.port}]: {e}')
+            print(f'[EXCEPT] - xmit data to {self}: {e}')
             abort = True
         return abort
 
+    def __str__(self) -> str:
+        return f'{self.role.name} [{self.host}:{self.port}]'
+
     def run(self) -> None:
+        if self.sock is None:
+            raise RuntimeError('Socket has expired. Can not start again after shutdown.')
+        self.lock.acquire()
         self.running = True
-        while self.running:
+        self.lock.release()
+        localRunning = True
+        while localRunning:
+            self.lock.acquire()
+            localRunning = self.running
+            self.lock.release()
             # Receive data from the host.
             data = False
             abort = False
@@ -247,7 +275,7 @@ class SocketHandler(Thread):
                     # No data was available at the time.
                     pass
                 except Exception as e:
-                    print(f'[EXCEPT] - recv data from {self.role.name} [{self.host}:{self.port}]: {e}')
+                    print(f'[EXCEPT] - recv data from {self}: {e}')
                     abort = True
             
             # If we got data, parse it.
@@ -255,9 +283,10 @@ class SocketHandler(Thread):
                 try:
                     # Parse the data. The parser may enqueue any data it wants to send on to the server.
                     # The parser adds any packages it actually wants to forward for the server to the queue.
-                    self.proxy.application.currentParser.parse(data, self.proxy, self.role)
+                    parser = self.proxy.application.getParserByProxy(self.proxy)
+                    parser.parse(data, self.proxy, self.role)
                 except Exception as e:
-                    print(f'[EXCEPT] - parse data from {self.role.name} [{self.host}:{self.port}]: {e}')
+                    print(f'[EXCEPT] - parse data from {self}: {e}')
                     print(traceback.format_exc())
                     self.stop()
             
@@ -277,8 +306,6 @@ class SocketHandler(Thread):
                 sleep(0.001)
         
         # Stopped, clean up socket.
-        if self.sock is None:
-            return
         # Send all remaining messages.
         sleep(0.1)
         self.sendQueue()

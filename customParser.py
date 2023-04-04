@@ -4,7 +4,7 @@ import struct
 from enum import Enum, auto
 
 # Allows pretty printing of bytes in a hexdump format
-from hexdump import hexdump
+from hexdump import Hexdump
 
 # import helper functions from core parser
 from coreParser import CoreParser
@@ -39,7 +39,7 @@ class ESettingKey(Enum):
         raise ValueError("Can not compare.")
 
     def __hash__(self):
-        return int.__hash__(self.value)
+        return self.value.__hash__()
 
 class CustomParser(CoreParser):
     # Use this to set sensible defaults for your stored variables.
@@ -103,7 +103,7 @@ class CustomParser(CoreParser):
             print(self.getHelpText(args[0]))
             return "Syntax error."
         
-        dataStr = str(self.getSetting(ESettingKey.EXAMPLE_SETTING, proxy))
+        dataStr = str(self.getSetting(ESettingKey.EXAMPLE_SETTING))
         
         if args[1] == 'upper':
             dataStr = dataStr.upper()
@@ -119,7 +119,7 @@ class CustomParser(CoreParser):
         data = dataStr.encode('utf-8')
         
         # xmit count times
-        if not proxy.running:
+        if not proxy.connected:
             return "Not connected"
 
         for _ in range(0, count):
@@ -142,8 +142,8 @@ class CustomParser(CoreParser):
     ###########################################################################
     # No need to touch anything below here.
 
-    def __init__(self, application):
-        super().__init__(application)
+    def __init__(self, application, settings):
+        super().__init__(application, settings)
         return
     
     def getSettingKeys(self) -> list[Enum]:
