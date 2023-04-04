@@ -168,6 +168,7 @@ class Proxy(Thread):
             sock.connect((self.remoteAddr, self.remotePort))
             self.server = SocketHandler(sock, ESocketRole.server, self)
             return True
+        # pylint: disable=broad-except
         except Exception as e:
             print(f'[{self}] Unable to connect to server {self.remoteAddr}:{self.remotePort}: {e}')
         return False
@@ -241,6 +242,7 @@ class SocketHandler(Thread):
                 message = self.dataQueue.get()
                 #print(f">>> Sending {len(message)} Bytes to {self.role.name}")
                 self.sock.sendall(message)
+        # pylint: disable=broad-except
         except Exception as e:
             print(f'[EXCEPT] - xmit data to {self}: {e}')
             abort = True
@@ -267,6 +269,7 @@ class SocketHandler(Thread):
             readyToRead, readyToWrite, _ = self.checkAlive()
 
             if readyToRead:
+                # pylint: disable=broad-except
                 try:
                     data = self.sock.recv(4096)
                     if len(data) == 0:
@@ -285,6 +288,7 @@ class SocketHandler(Thread):
                     # The parser adds any packages it actually wants to forward for the server to the queue.
                     parser = self.proxy.application.getParserByProxy(self.proxy)
                     parser.parse(data, self.proxy, self.role)
+                # pylint: disable=broad-except
                 except Exception as e:
                     print(f'[EXCEPT] - parse data from {self}: {e}')
                     print(traceback.format_exc())

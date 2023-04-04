@@ -55,7 +55,7 @@ class Application():
         # Create a proxies and parsers based on arguments.
         idx = 0
         for localPort, remotePort in zip([x[0] for x in args.port], [x[1] for x in args.port]):
-            name = f'PROXY_{idx}'
+            name = f'PROXY_{localPort}'
             proxy = Proxy(self, args.bind, args.remote, localPort, remotePort, name)
             parser = Parser.CustomParser(self, {})
             self.proxies[name] = proxy
@@ -113,11 +113,12 @@ class Application():
                 # resolve escaped ! and $.
                 if cmd != escapedCmd:
                     print(f"Expanded: {escapedCmd}")
-                                
+
                 # Handle the command
                 cmdReturn = self.getSelectedParser().handleUserInput(escapedCmd, self.getSelectedProxy())
                 if cmdReturn != 0:
                     print(f"Error: {cmdReturn}")
+            # pylint: disable=broad-except
             except Exception as e:
                 print(f'[EXCEPT] - User Input: {e}')
                 print(traceback.format_exc())

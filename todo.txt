@@ -1,5 +1,7 @@
 Do:
 - command to toggle notifications
+- variable expansion format $(varname) as well as $varname
+- move completers from completer.py to core and base parsers
 
 - allow starting proxies from CLI
     command create name remotehost localport remoteport
@@ -41,4 +43,4 @@ Fix:
 - Latest command not part of history
 - clearhistory <id> not working
 - pack/unpack c_string and pascal_string not working right
-
+- no prompt after parser output

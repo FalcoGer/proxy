@@ -88,7 +88,8 @@ class CoreParser():
         if self.getSetting(ECoreSettingKey.PACKETNOTIFICATION_ENABLED):
             # Print out the data in a nice format.
             directionStr = "C -> S" if origin == ESocketRole.client else "C <- S"
-            print(f"[{directionStr}] - {proxy} ({len(data)} Byte{'s' if len(data) > 1 else ''})")
+            maxProxyNameLen = max(len(proxy.name) for proxy in self.application.proxies.values())
+            print(f"{proxy.name.ljust(maxProxyNameLen)} [{directionStr}] - ({len(data)} Byte{'s' if len(data) > 1 else ''})")
 
         if self.getSetting(ECoreSettingKey.HEXDUMP_ENABLED):
             hexdumpObj = self.getSetting(ECoreSettingKey.HEXDUMP)
@@ -274,6 +275,7 @@ class CoreParser():
             with open(filePath, "rb") as file:
                 while byte := file.read(1):
                     byteArray += byte
+        # pylint: disable=broad-except
         except Exception as e:
             return f"Error reading file \"{filePath}\": {e}"
 
