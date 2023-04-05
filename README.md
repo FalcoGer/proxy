@@ -12,5 +12,5 @@ The main features include:
 - The binding ports stay open, if you get disconnected, just connect again. No need to restart the proxy. Connecting again with a connection already open closes that connection.
 - Spin up multiple proxies at once by providing more port pairs
 - Extensive online help with the `help` command
-- You can set variables and store them to a file to be reloaded later and them use those variables in your commands.
+- You can set variables and store them to a file to be reloaded later and then use those variables in your commands.
 
