@@ -1,30 +1,9 @@
 Do:
-- command to toggle notifications in base_parser
-
 - variable expansion format $(varname) as well as $varname
     completer also must work with this, even $(var1)$(va [TAB] should complete.
 
-- allow starting proxies from CLI
-    command create name remotehost localport remoteport
-    make sure name doesn't exist already
-
-- allow stopping proxies from CLI
-    command kill [name] - if name empty, kill current and select first
-    make sure either always 1 active or some form of fallback is in place if no proxies exist
-
 - allow running of scripts from file
     command run file
-
-- allow renaming of proxies
-    command rename [newName]
-    make sure to also update the name attribute in the proxy itself
-    make sure to adjust the keys in all relevant dictionaries
-      d[newKey] = d.pop(oldKey)
-    make sure that a proxy with that name doesn't exist already
-
-- allow selecting proxies by ID and binding port
-  command select proxyname|ID|Port
-    ID goes first if both port and ID exist (unlikely)
 
 Fix:
 - Latest command not part of history

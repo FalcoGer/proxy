@@ -99,7 +99,7 @@ class Parser(base_parser.Parser):
         ret = super().buildCommandDict()
         
         # Add your custom commands here
-        ret['example']      = (self._cmd_example, 'Sends the string in the example setting n times to the client.\nUsage: {0} [upper | lower | as_is] count\nExample {0} as_is 10.', [self._exampleCompleter, self._historyCompleter, None])
+        ret['example']      = (self._cmd_example, 'Sends the string in the example setting count times to the client.\nUsage: {0} [upper | lower | as_is] <count>\nExample {0} as_is 10.', [self._exampleCompleter, self._historyCompleter, None])
         # Alises
         ret['ex']           = ret['example']
         return ret

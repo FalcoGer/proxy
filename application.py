@@ -15,20 +15,39 @@ from parser_container import ParserContainer
 
 class Application():
     def __init__(self):
+        self.HISTORY_FILE = "history.log"
+        self.DEFAULT_PARSER_MODULE = "passthrough_parser"
+        
         self.variables: dict[(str, str)] = {}
         self.running = True
-        self.HISTORY_FILE = "history.log"
         self.selectedProxyName: str = None
         self.proxies: dict[(str, Proxy)] = {}
         self.parsers: dict[(Proxy, ParserContainer)] = {None: ParserContainer('core_parser', self)}
         
         # parse command line arguments.
-        arg_parser = argparse.ArgumentParser(description='Create multiple proxy connections. Provide multiple port parameters to create multiple proxies.')
-        arg_parser.add_argument('-b', '--bind', required=False, help='Bind IP-address for the listening socket. Default \'0.0.0.0\'', default='0.0.0.0')
-        arg_parser.add_argument('-r', '--remote', type=str, required=True, help='Host IP-address or hostname to connect to.')
-        arg_parser.add_argument('-p', '--port', type=int, nargs=2, metavar=('localport', 'remoteport'), action='append', required=True, help='Local and remote port')
+        arg_parser = argparse.ArgumentParser(description='Create multiple proxy connections. Provide multiple proxy parameters to create multiple proxies.')
+        arg_parser.add_argument('-b', '--bind', metavar=('binding_address'), required=False, help='Bind IP-address for the listening socket. Default \'0.0.0.0\'', default='0.0.0.0')
+        arg_parser.add_argument('-p', '--proxy', nargs=3, metavar=('lp', 'rp', 'host'), action='append', required=False, help='Local port to listen on as well as the remote port and host ip address or hostname for the proxy to connect to.')
 
-        args = arg_parser.parse_args()
+        self.args = arg_parser.parse_args()
+
+        # Fix proxy argument Typing since nargs > 1 doesn't support multiple types such as (int, int, str)
+        # REF: https://github.com/python/cpython/issues/82398
+        if self.args.proxy is not None:
+            try:
+                idx = 0
+                for proxyArgs in self.args.proxy:
+                    localPort = int(proxyArgs[0])
+                    remotePort = int(proxyArgs[1])
+                    remoteHost = proxyArgs[2]
+
+                    self.args.proxy[idx] = [localPort, remotePort, remoteHost]
+                    idx += 1
+
+            except TypeError as e:
+                print(f"Error: {e}")
+                arg_parser.print_usage()
+                raise e
         
         # Setup readline
         readline.parse_and_bind('tab: complete')
@@ -49,18 +68,22 @@ class Application():
             print(f"Can not read or create {self.HISTORY_FILE}: {e}")
 
         # Create a proxies and parsers based on arguments.
-        idx = 0
-        for localPort, remotePort in zip([x[0] for x in args.port], [x[1] for x in args.port]):
-            name = f'PROXY_{localPort}'
-            proxy = Proxy(self, args.bind, args.remote, localPort, remotePort, name)
-            parser = ParserContainer('passthrough_parser', self)
-            self.proxies[name] = proxy
-            self.parsers[proxy] = parser
-            proxy.start()
-            # Select the first proxy
-            if idx == 0:
-                self.selectProxy(name)
-            idx += 1
+        if self.args.proxy is not None:
+            idx = 0
+            for proxyArgs in self.args.proxy:
+                localPort = proxyArgs[0]
+                remotePort = proxyArgs[1]
+                remoteHost = proxyArgs[2]
+
+                name = f'PROXY_{localPort}'
+                self.createProxy(name, localPort, remotePort, remoteHost)
+                # Select the first proxy
+                if idx == 0:
+                    self.selectProxyByName(name)
+                idx += 1
+        else:
+            # To initialize the completer for the core_parser
+            self.selectProxy(None)
 
     def main(self) -> None:
         # Accept user input and parse it.
@@ -140,6 +163,16 @@ class Application():
 
         return self.proxies[name]
 
+    def getProxyByNumber(self, num: int) -> Proxy:
+        # By ID
+        if num < len(self.proxies):
+            return list(self.proxies.values())[num]
+        # ID not found, maybe port number?
+        for proxy in self.proxies.values():
+            if proxy.localPort == num:
+                return proxy
+        raise IndexError(f'No proxy found with either local port or index {num}.')
+
     def getParserByProxy(self, proxy: Proxy):
         return self.parsers[proxy].getInstance()
 
@@ -147,17 +180,97 @@ class Application():
         proxy = self.getProxyByName(name)
         return self.getParserByProxy(proxy)
 
-    def setParserForProxyByName(self, proxyName, parserName) -> None:
-        proxy = self.getProxyByName(proxyName)
+    def setParserForProxy(self, proxy, parserName) -> None:
         newParser = ParserContainer(parserName, self)
         self.parsers[proxy] = newParser
+        return
 
-    def selectProxy(self, name: str) -> None:
-        if name is not None and name not in self.proxies:
-            raise KeyError(f"{name} is not a valid proxy name.")
-        self.selectedProxyName = name
+    def setParserForProxyByName(self, proxyName, parserName) -> None:
+        proxy = self.getProxyByName(proxyName)
+        self.setParserForProxy(proxy, parserName)
+        return
+
+    def selectProxy(self, proxy: Proxy) -> None:
+        if proxy is None:
+            self.selectedProxyName = None
+        else:
+            self.selectedProxyName = proxy.name
+        
         # reload the correct completer
         readline.set_completer(self.getSelectedParser().completer.complete)
+        return
+
+    def selectProxyByName(self, name: str) -> None:
+        self.selectProxy(self.getProxyByName(name))
+        return
+
+    def selectProxyByNumber(self, num: int) -> None:
+        proxy = self.getProxyByNumber(num)
+        self.selectProxy(proxy)
+
+    def createProxy(self, proxyName: str, localPort: int, remotePort: int, remoteHost: str):
+        if proxyName is None:
+            raise ValueError('proxyName must not be none.')
+        if len(proxyName) == 0:
+            raise ValueError('proxyName must not be empty.')
+        if ord(proxyName[0]) in range(ord('0'), ord('9') + 1):
+            raise ValueError('proxyName must not start with a digit.')
+        
+        if proxyName in self.proxies:
+            raise KeyError(f'There already is a proxy with the name {proxyName}.')
+
+        # Create proxy and default parser
+        proxy = Proxy(self, self.args.bind, remoteHost, localPort, remotePort, proxyName)
+        parser = ParserContainer(self.DEFAULT_PARSER_MODULE, self)
+        
+        # Add them to their dictionaries
+        self.proxies[proxy.name] = proxy
+        self.parsers[proxy] = parser
+        
+        # Start the proxy thread
+        proxy.start()
+        return
+
+    def killProxy(self, proxy: Proxy) -> None:
+        # pop proxy from he dict
+        if self.getSelectedProxy() == proxy:
+            self.selectProxy(None)
+
+        proxy = self.proxies.pop(proxy.name)
+        # Kill it
+        proxy.shutdown()
+        # Wait for the thread to finish
+        proxy.join()
+
+        # Delete Parser
+        self.parsers.pop(proxy)
+        return
+
+    def killProxyByName(self, proxyName: str) -> None:
+        self.killProxy(self.getProxyByName(proxyName))
+        return
+
+    def renameProxy(self, proxy: Proxy, newName: str) -> None:
+        if newName is None:
+            raise ValueError('newName must not be none.')
+        if len(newName) == 0:
+            raise ValueError('newName must not be empty.')
+        if ord(newName[0]) in range(ord('0'), ord('9') + 1):
+            raise ValueError('newName must not start with a digit.')
+        
+        if newName in self.proxies:
+            raise KeyError(f'Proxy with name {newName} already exists.')
+        
+        self.proxies[newName] = self.proxies.pop(proxy.name)
+        # Make sure we update the selected proxy if we rename the currently selected one.
+        if self.selectedProxyName == proxy.name:
+            self.selectedProxyName = newName
+        proxy.name = newName
+        return
+
+    def renameProxyByName(self, oldName: str, newName: str) -> None:
+        proxy = self.getProxyByName(oldName)
+        self.renameProxy(proxy, newName)
         return
 
     def getVariable(self, variableName: str) -> str:

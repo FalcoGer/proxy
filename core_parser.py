@@ -95,25 +95,31 @@ class Parser():
     # The last completer in the completer array will be used for all words if the word index is higher than the index in the completer array.
     # If you don't want to provide more completions, use None at the end.
     def buildCommandDict(self) -> dict:
+        proxySelectionNote = "Note: Proxy may be selected by ID, LocalPort or it's name.\nThe ID has preference over LocalPort."
+
         ret = {}
         ret['help']         = (self._cmd_help, 'Print available commands. Or the help of a specific command.\nUsage: {0} [command]', [self._commandCompleter, None])
         ret['quit']         = (self._cmd_quit, 'Stop the proxy and quit.\nUsage: {0}', None)
-        ret['select']       = (self._cmd_select, 'Select a different proxy to give commands to.\nUsage: {0} ID\nNote: Use \"lsproxy\" to figure out the ID.', [self._proxyNameCompleter, None])
+        ret['select']       = (self._cmd_select, f'Select a different proxy to give commands to.\nUsage: {{0}} <Proxy>\n{proxySelectionNote}.', [self._proxyNameCompleter, None])
         ret['deselect']     = (self._cmd_deselect, 'Deselect the currently selected proxy.\nUsage: {0}', None)
-        ret['loadparser']   = (self._cmd_loadparser, 'Load a custom parser for proxy.\nUsage: {0} proxyname parsername\nExample: {0} PROXY_8080 example_parser', [self._proxyNameCompleter, self._parserNameCompleter, None])
+        ret['new']          = (self._cmd_new, 'Create a new proxy.\nUsage: {0} <LocalPort> <RemotePort> <host> [<ProxyName>] [<ParserModule>]', [self._historyCompleter, self._historyCompleter, self._historyCompleter, self._historyCompleter, self._parserNameCompleter, None])
+        ret['kill']         = (self._cmd_kill, f'Stop a proxy.\nUsage: {{0}} [<Proxy>]\nIf Proxy is omitted, this kills the currently selected proxy.\n{proxySelectionNote}', [self._proxyNameCompleter])
+        ret['rename']       = (self._cmd_rename, f'Rename a proxy.\nUsage: {{0}} [<Proxy>] <NewName>\nIf Proxy is omitted, this renames the currently selected proxy.\n{proxySelectionNote}', [self._proxyNameCompleter, self._historyCompleter, None])
+        ret['disconnect']   = (self._cmd_disconnect, 'Disconnect from the client and server.\nUsage: {0} [<Proxy>]\n{proxySelectionNote}', [self._proxyNameCompleter, None])
+        ret['loadparser']   = (self._cmd_loadparser, f'Load a custom parser for proxy.\nUsage: {{0}} [<Proxy>] <ParserName>\nExample: {{0}} PROXY_8080 example_parser\nIf Proxy is omitted, this changes the parser of the currently selected proxy.\n{proxySelectionNote}', [self._proxyNameCompleter, self._parserNameCompleter, None])
         ret['lsproxy']      = (self._cmd_lsproxy, 'Display all configured proxies and their status.\nUsage: {0}', None)
-        ret['clearhistory'] = (self._cmd_clearhistory, 'Clear the command history or delete one entry of it.\nUsage: {0} [historyIndex].\nNote: The history file will instantly be overwritten.', None)
-        ret['lshistory']    = (self._cmd_lshistory, 'Show the command history or display one entry of it.\nUsage: {0} [historyIndex]', None)
-        ret['lssetting']    = (self._cmd_lssetting, 'Show the current settings or display a specific setting.\nUsage: {0} [settingName]', [self._settingsCompleter, None])
-        ret['set']          = (self._cmd_set, 'Sets variable to a value\nUsage: {0} varname value\nExample: {0} httpGet GET / HTTP/1.0\\n', [self._variableCompleter, self._historyCompleter])
-        ret['unset']        = (self._cmd_unset, 'Deletes a variable.\nUsage: {0} varname\nExample: {0} httpGet', [self._variableCompleter, None])
-        ret['lsvars']        = (self._cmd_lsvars, 'Lists variables.\nUsage: {0} [varname]\nExample: {0}\nExample: {0} httpGet', [self._variableCompleter, None])
-        ret['savevars']     = (self._cmd_savevars, 'Saves variables to a file.\nUsage: {0} filepath', [self._fileCompleter, None])
-        ret['loadvars']     = (self._cmd_loadvars, 'Loads variables from a file\nUsage: {0} filename\nNote: Existing variables will be retained.\nUse clearvars before loading if you want the variables from that file only.', [self._fileCompleter, None])
+        ret['clearhistory'] = (self._cmd_clearhistory, 'Clear the command history or delete one entry of it.\nUsage: {0} [<HistoryIndex>].\nNote: The history file will instantly be overwritten.', None)
+        ret['lshistory']    = (self._cmd_lshistory, 'Show the command history or display one entry of it.\nUsage: {0} [<HistoryIndex>]', None)
+        ret['lssetting']    = (self._cmd_lssetting, 'Show the current settings or display a specific setting.\nUsage: {0} [<SettingName>]', [self._settingsCompleter, None])
+        ret['set']          = (self._cmd_set, 'Sets variable to a value\nUsage: {0} <VariableName> <Value>\nExample: {0} httpGet GET / HTTP/1.0\\n', [self._variableCompleter, self._historyCompleter])
+        ret['unset']        = (self._cmd_unset, 'Deletes a variable.\nUsage: {0} <VariableName>\nExample: {0} httpGet', [self._variableCompleter, None])
+        ret['lsvars']        = (self._cmd_lsvars, 'Lists variables.\nUsage: {0} [<VariableName>]\nExample: {0}\nExample: {0} httpGet', [self._variableCompleter, None])
+        ret['savevars']     = (self._cmd_savevars, 'Saves variables to a file.\nUsage: {0} <FilePath>', [self._fileCompleter, None])
+        ret['loadvars']     = (self._cmd_loadvars, 'Loads variables from a file\nUsage: {0} <FilePath>\nNote: Existing variables will be retained.', [self._fileCompleter, None])
         ret['clearvars']    = (self._cmd_clearvars, 'Clears variables.\nUsage: {0}', None)
-        ret['pack']         = (self._cmd_pack, 'Packs data into a different format.\nUsage: {0} datatype format data [...]\nNote: Data is separated by spaces.\nExample: {0} int little_endian 255 0377 0xFF\nExample: {0} byte little_endian 41 42 43 44\nExample: {0} uchar little_endian x41 x42 x43 x44\nRef: https://docs.python.org/3/library/struct.html', [self._packDataTypeCompleter, self._packFormatCompleter, self._historyCompleter])
-        ret['unpack']       = (self._cmd_unpack, 'Unpacks and displays data from a different format.\nUsage: {0} datatype format hexdata\nNote: Hex data may contain spaces, they are ignored.\nExample: {0} int little_endian 01000000 02000000\nExample: {0} c_string native 41424344\nRef: https://docs.python.org/3/library/struct.html', [self._packDataTypeCompleter, self._packFormatCompleter, self._historyCompleter])
-        ret['convert']      = (self._cmd_convert, 'Converts numbers from one type to all others.\nUsage: {0} [sourceFormat] number\nExample: {0} dec 65\nExample: {0} 0x41', [self._convertTypeCompleter, self._historyCompleter, None])
+        ret['pack']         = (self._cmd_pack, 'Packs data into a different format.\nUsage: {0} <DataType> <Format> <Data> [<Data> ...]\nNote: Data is separated by spaces.\nExample: {0} int little_endian 255 0377 0xFF\nExample: {0} byte little_endian 41 42 43 44\nExample: {0} uchar little_endian x41 x42 x43 x44\nRef: https://docs.python.org/3/library/struct.html\nNote: Use auto-complete.', [self._packDataTypeCompleter, self._packFormatCompleter, self._historyCompleter])
+        ret['unpack']       = (self._cmd_unpack, 'Unpacks and displays data from a different format.\nUsage: {0} <DataType> <Format> <HexData>\nNote: Hex data may contain spaces, they are ignored.\nExample: {0} int little_endian 01000000 02000000\nExample: {0} c_string native 41424344\nRef: https://docs.python.org/3/library/struct.html\nNote: Use auto-complete.', [self._packDataTypeCompleter, self._packFormatCompleter, self._historyCompleter])
+        ret['convert']      = (self._cmd_convert, 'Converts numbers from one type to all others.\nUsage: {0} [<SourceFormat>] <Number>\nExample: {0} dec 65\nExample: {0} 0x41\nNote: If source format is not specified, it will be derrived from the format of the number itself.', [self._convertTypeCompleter, self._historyCompleter, None])
 
         # Aliases
         ret['exit']         = ret['quit']
@@ -128,7 +134,7 @@ class Parser():
         
         return ret
 
-    def _cmd_help(self, args: list[str], proxy) -> object:
+    def _cmd_help(self, args: list[str], _) -> object:
         if len(args) > 2:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -160,19 +166,41 @@ class Parser():
         print("  Where numbers are required, they may be prefixed:\n    - x or 0x for hex\n    - 0, o or 0o for octal\n    - b or 0b for binary\n    - No prefix for decimal.")
         return 0
 
-    def _cmd_select(self, args: list[str], proxy) -> object:
+    def _cmd_disconnect(self, args: list[str], proxy) -> object:
+        if len(args) not in [1, 2]:
+            print(self.getHelpText(args[0]))
+            return "Syntax error."
+        
+        proxyToDisconnect = proxy
+        if len(args) == 2:
+            try:
+                proxyToDisconnect = self._aux_get_proxy_by_arg(args[1])
+            except (IndexError, KeyError) as e:
+                return f"Could not find proxy by {args[1]}: {e}"
+        elif proxyToDisconnect is None:
+            print(self.getHelpText(args[0]))
+            return "No proxy selected."
+
+        if not proxyToDisconnect.connected:
+            return "Not connected."
+
+        proxyToDisconnect.disconnect()
+        return 0
+
+    def _cmd_select(self, args: list[str], _) -> object:
         if len(args) != 2:
             print(self.getHelpText(args[0]))
             return "Syntax error."
         
         try:
-            self.application.selectProxy(args[1])
-        except IndexError as e:
+            proxy = self._aux_get_proxy_by_arg(args[1])
+            self.application.selectProxy(proxy)
+        except (IndexError, KeyError) as e:
             return f"Unable to select proxy {args[1]}: {e}"
         
         return 0
 
-    def _cmd_deselect(self, args: list[str], proxy) -> object:
+    def _cmd_deselect(self, args: list[str], _) -> object:
         if len(args) > 1:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -180,23 +208,116 @@ class Parser():
         self.application.selectProxy(None)
         return 0
 
-    def _cmd_loadparser(self, args: list[str], proxy) -> object:
-        if len(args) != 3:
+    def _cmd_new(self, args: list[str], _) -> object:
+        # args: lp rp host [proxyname] [parsername]
+        if len(args) not in [4, 5, 6]:
             print(self.getHelpText(args[0]))
             return "Syntax error."
-        proxyName = args[1]
-        parserName = args[2]
 
         try:
-            self.application.setParserForProxyByName(proxyName, parserName)
+            lp = self._strToInt(args[1])
+        except ValueError as e:
+            return f"Could not convert {args[1]} into a number: {e}"
+        
+        try:
+            rp = self._strToInt(args[2])
+        except ValueError as e:
+            return f"Could not convert {args[2]} into a number: {e}"
+        
+        host = args[3]
+        name = f"PROXY_{lp}"
+        parserName = self.application.DEFAULT_PARSER_MODULE
+        if len(args) >= 5:
+            name = args[4]
+        if len(args) >= 6:
+            parserName = args[5]
+        
+        try:
+            self.application.createProxy(name, lp, rp, host)
+        except (ValueError, KeyError) as e:
+            return f"Bad name: {e}"
+
+        try:
+            self.application.setParserForProxyByName(name, parserName)
+        except ImportError as e:
+            return f"Could not set parser \"{parserName}\" for {name}: {e}"
+
+        return 0
+
+    def _cmd_kill(self, args: list[str], proxy) -> object:
+        if len(args) not in [1, 2]:
+            print(self.getHelpText(args[0]))
+            return "Syntax error."
+
+        proxyToKill = proxy
+        if len(args) == 2:
+            try:
+                proxyToKill = self._aux_get_proxy_by_arg(args[1])
+            except (IndexError, KeyError) as e:
+                return f"Could not select proxy by {args[1]}: {e}"
+        elif proxyToKill is None:
+            print(self.getHelpText(args[0]))
+            return "No proxy selected."
+        
+        print(f"Shutting down {proxyToKill}.")
+        print(f"This can take up to {proxyToKill.BIND_SOCKET_TIMEOUT} seconds.")
+        self.application.killProxy(proxyToKill)
+        
+        return 0
+
+    def _cmd_rename(self, args: list[str], proxy) -> object:
+        # args: [proxy], newName
+        if len(args) not in [2, 3]:
+            print(self.getHelpText(args[0]))
+            return "Syntax error."
+
+        proxyToRename = proxy
+        if len(args) == 3:
+            try:
+                proxyToRename = self._aux_get_proxy_by_arg(args[1])
+            except (KeyError, IndexError) as e:
+                return f'Could not select proxy by {args[1]}: {e}'
+        elif proxyToRename is None:
+            print(self.getHelpText(args[0]))
+            return "No proxy selected."
+        try:
+            self.application.renameProxy(proxyToRename, args[-1])
+        except (ValueError, KeyError) as e:
+            return f"Could not rename proxy to {args[-1]}: {e}"
+
+        return 0
+    
+    def _aux_get_proxy_by_arg(self, arg: str):
+        try:
+            num = self._strToInt(arg) # Raises ValueError
+            return self.application.getProxyByNumber(num) # Raises IndexError
+        except ValueError:
+            # Failed to convert to a number
+            pass
+        return self.application.getProxyByName(arg) # Raises KeyError
+
+    def _cmd_loadparser(self, args: list[str], proxy) -> object:
+        # args: [proxy], newParser
+        if len(args) not in [2, 3]:
+            print(self.getHelpText(args[0]))
+            return "Syntax error."
+        parserName = args[-1]
+        try:
+            proxyToReloadParser = proxy
+            if len(args) == 3:
+                proxyToReloadParser = self._aux_get_proxy_by_arg(args[1])
+            elif proxyToReloadParser is None:
+                print(self.getHelpText(args[0]))
+                return "No proxy selected."
+            self.application.setParserForProxy(proxyToReloadParser, parserName)
         except ImportError as e:
             return f'Could not load {parserName}: {e}'
         except KeyError as e:
-            return f'Could not find {proxyName}: {e}'
+            return f'Could not find proxy by {args[1]}: {e}'
             
         return 0
 
-    def _cmd_lsproxy(self, args: list[str], proxy) -> object:
+    def _cmd_lsproxy(self, args: list[str], _) -> object:
         if len(args) > 1:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -208,14 +329,14 @@ class Parser():
             idx += 1
         return 0
 
-    def _cmd_quit(self, args: list[str], proxy) -> object:
+    def _cmd_quit(self, args: list[str], _) -> object:
         if len(args) > 1:
             print(self.getHelpText(args[0]))
             return "Syntax error."
         self.application.running = False
         return 0
 
-    def _cmd_lshistory(self, args: list[str], proxy) -> object:
+    def _cmd_lshistory(self, args: list[str], _) -> object:
         if len(args) > 2:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -241,7 +362,7 @@ class Parser():
             print(f"{idx} - \"{historyline}\"")
         return 0
 
-    def _cmd_clearhistory(self, args: list[str], proxy) -> object:
+    def _cmd_clearhistory(self, args: list[str], _) -> object:
         readline = self.application.getReadlineModule()
 
         if len(args) > 2:
@@ -269,7 +390,7 @@ class Parser():
         readline.write_history_file(self.application.HISTORY_FILE)
         return 0
 
-    def _cmd_lssetting(self, args: list[str], proxy) -> object:
+    def _cmd_lssetting(self, args: list[str], _) -> object:
         if len(args) > 2:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -290,7 +411,7 @@ class Parser():
             return 0
         
         if len(self.getSettingKeys()) == 0:
-            print(f'There are no settings for this parser.')
+            print('There are no settings for this parser.')
             return 0
 
         # Print them all
@@ -302,7 +423,7 @@ class Parser():
             print(f"{keyNameStr}: {value}")
         return 0
 
-    def _cmd_set(self, args: list[str], proxy) -> object:
+    def _cmd_set(self, args: list[str], _) -> object:
         if len(args) < 3:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -317,7 +438,7 @@ class Parser():
         self.application.setVariable(varName, varValue)
         return 0
 
-    def _cmd_unset(self, args: list[str], proxy) -> object:
+    def _cmd_unset(self, args: list[str], _) -> object:
         if len(args) != 2:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -328,7 +449,7 @@ class Parser():
             return f"Variable {args[1]} doesn't exist."
         return 0
 
-    def _cmd_lsvars(self, args: list[str], proxy) -> object:
+    def _cmd_lsvars(self, args: list[str], _) -> object:
         if len(args) > 2:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -355,14 +476,14 @@ class Parser():
             print(f"{varName.rjust(maxVarNameLength)} - \"{varValue}\"")
         return 0
 
-    def _cmd_savevars(self, args: list[str], proxy) -> object:
+    def _cmd_savevars(self, args: list[str], _) -> object:
         if len(args) != 2:
             print(self.getHelpText(args[0]))
             return "Syntax error."
         
         filePath = ' '.join(args[1:])
         try:
-            with open(filePath, "wt") as file:
+            with open(filePath, "wt", encoding='utf-8') as file:
                 for varName in self.application.variables.keys():
                     varValue = self.application.getVariable(varName)
                     file.write(f"{varName} {varValue}\n")
@@ -371,7 +492,7 @@ class Parser():
 
         return 0
 
-    def _cmd_loadvars(self, args: list[str], proxy) -> object:
+    def _cmd_loadvars(self, args: list[str], _) -> object:
         if len(args) != 2:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -379,7 +500,7 @@ class Parser():
         filePath = ' '.join(args[1:])
         try:
             loadedVars = {}
-            with open(filePath, "rt") as file:
+            with open(filePath, "rt", encoding='utf-8') as file:
                 lineNumber = 0
                 for line in file.readlines():
                     line = line.strip('\n')
@@ -416,7 +537,7 @@ class Parser():
 
         return 0
 
-    def _cmd_clearvars(self, args: list[str], proxy) -> object:
+    def _cmd_clearvars(self, args: list[str], _) -> object:
         if len(args) != 1:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -424,7 +545,7 @@ class Parser():
         print("All variables deleted.")
         return 0
 
-    def _cmd_pack(self, args: list[str], proxy) -> object:
+    def _cmd_pack(self, args: list[str], _) -> object:
         # FIXME: cstring and pascal string not working correctly.
         if len(args) < 4:
             print(self.getHelpText(args[0]))
@@ -466,7 +587,7 @@ class Parser():
         print(f"Hex: {asHex}")
         return 0
 
-    def _cmd_unpack(self, args: list[str], proxy) -> object:
+    def _cmd_unpack(self, args: list[str], _) -> object:
         if len(args) < 4:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -564,7 +685,7 @@ class Parser():
 
         return mapping
 
-    def _cmd_convert(self, args: list[str], proxy) -> object:
+    def _cmd_convert(self, args: list[str], _) -> object:
         if len(args) not in [2, 3]:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -633,7 +754,7 @@ class Parser():
     def _commandCompleter(self) -> None:
         self.completer.candidates.extend( [
                 s
-                for s in self.commandDictionary.keys()
+                for s in self.commandDictionary
                 if s and s.startswith(self.completer.being_completed)
             ]
         )
@@ -720,7 +841,7 @@ class Parser():
                     # Skip files that are too large to check
                     continue
 
-                with open(fileName, "rt") as file:
+                with open(fileName, "rt", encoding='utf-8') as file:
                     # Find the "class Parser(" string in the file
                     # Need to do it in steps because there may be any number of whitespaces
                     while line := file.readline():
@@ -735,7 +856,7 @@ class Parser():
                             continue
                         isCandidate = True
                         break
-            except (IOError, PermissionError, IsADirectoryError) as e:
+            except (IOError, PermissionError, IsADirectoryError):
                 continue
             
             if not isCandidate:

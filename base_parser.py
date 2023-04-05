@@ -102,33 +102,45 @@ class Parser(core_parser.Parser):
     def buildCommandDict(self) -> dict:
         ret = super().buildCommandDict()
 
-        ret['disconnect']   = (self._cmd_disconnect, 'Disconnect from the client and server and wait for a new connection.\n Usage: {0}', None)
-        ret['hexdump']      = (self._cmd_hexdump, 'Configure the hexdump or show current configuration.\nUsage: {0} [yes|no] [bytesPerLine] [bytesPerGroup]', [self._yesNoCompleter, self._historyCompleter, self._historyCompleter, None])
-        ret['sh']           = (self._cmd_sh, 'Send arbitrary hex values to the server.\nUsage: {0} hexstring \nExample: {0} 41424344\nNote: Spaces are allowed and ignored.', [self._historyCompleter])
-        ret['ss']           = (self._cmd_ss, 'Send arbitrary strings to the server.\nUsage: {0} string\nExample: {0} hello\\!\\n\nNote: Leading spaces in the string are sent\nexcept for the space between the command and\nthe first character of the string.\nEscape sequences are available.', [self._historyCompleter])
-        ret['sf']           = (self._cmd_sf, 'Send arbitrary files to the server.\nUsage: {0} filename\nExample: {0} /home/user/.bashrc', [self._fileCompleter, None])
-        ret['ch']           = (self._cmd_ch, 'Send arbitrary hex values to the client.\nUsage: {0} hexstring \nExample: {0} 41424344', [self._historyCompleter])
-        ret['cs']           = (self._cmd_cs, 'Send arbitrary strings to the client.\nUsage: {0} string\nExample: {0} hello!\\n\nNote: Leading spaces in the string are sent\nexcept for the space between the command and\nthe first character of the string.\nEscape sequences are available.', [self._historyCompleter])
-        ret['cf']           = (self._cmd_cf, 'Send arbitrary files to the client.\nUsage: {0} filename\nExample: {0} /home/user/.bashrc', [self._fileCompleter, None])
+        sendHexNote = "Usage: {0} <HexData> \nExample: {0} 41424344\nNote: Spaces in hex data are allowed and ignored."
+        sendStringNote = "Usage: {0} <String>\nExample: {0} hello\\!\\n\nNote: Leading spaces in the string are sent\nexcept for the space between the command and\nthe first character of the string.\nEscape sequences are available."
+        sendFileNote = "Usage: {0} filename\nExample: {0} /home/user/.bashrc"
 
-        # Aliases
+        ret['hexdump']      = (self._cmd_hexdump, 'Configure the hexdump or show current configuration.\nUsage: {0} [yes|no] [<BytesPerLine>] [<BytesPerGroup>]', [self._yesNoCompleter, self._historyCompleter, self._historyCompleter, None])
+        ret['notify']       = (self._cmd_notify, 'Configure packet notifications.\nUsage: {0} [yes|no]\nIf argument omitted, this will toggle the notifications.', [self._yesNoCompleter, None])
+        ret['h2s']          = (self._cmd_h2s, f'Send arbitrary hex values to the server.\n{sendHexNote}', [self._historyCompleter])
+        ret['s2s']          = (self._cmd_s2s, f'Send arbitrary strings to the server.\n{sendStringNote}', [self._historyCompleter])
+        ret['f2s']          = (self._cmd_f2s, f'Send arbitrary files to the server.\n{sendFileNote}', [self._fileCompleter, None])
+        ret['h2c']          = (self._cmd_h2c, f'Send arbitrary hex values to the client.\n{sendHexNote}', [self._historyCompleter])
+        ret['s2c']          = (self._cmd_s2c, f'Send arbitrary strings to the client.\n{sendStringNote}', [self._historyCompleter])
+        ret['f2c']          = (self._cmd_f2c, f'Send arbitrary files to the client.\n{sendFileNote}', [self._fileCompleter, None])
+
         return ret
     
-    def _cmd_disconnect(self, args: list[str], proxy) -> object:
-        if len(args) > 1:
+    def _cmd_notify(self, args: list[str], _) -> object:
+        if not len(args) in [1, 2]:
             print(self.getHelpText(args[0]))
             return "Syntax error."
-            
-        if not proxy.connected:
-            return "Not connected."
+        
+        newState = not self.getSetting(EBaseSettingKey.PACKETNOTIFICATION_ENABLED)
+        if len(args) == 2:
+            if args[1] == 'yes':
+                newState = True
+            elif args[1] == 'no':
+                newState = False
+            else:
+                print(self.getHelpText(args[0]))
+                return "Syntax error."
+        
+        self.setSetting(EBaseSettingKey.PACKETNOTIFICATION_ENABLED, newState)
+        print(f'Packet notifications are now {"enabled" if newState else "disabled"}.')
 
-        proxy.disconnect()
         return 0
 
-    def _cmd_sh(self, args: list[str], proxy) -> object:
+    def _cmd_h2s(self, args: list[str], proxy) -> object:
         return self._aux_cmd_send_hex(args, ESocketRole.server, proxy)
 
-    def _cmd_ch(self, args: list[str], proxy) -> object:
+    def _cmd_h2c(self, args: list[str], proxy) -> object:
         return self._aux_cmd_send_hex(args, ESocketRole.client, proxy)
 
     def _aux_cmd_send_hex(self, args: list[str], target: ESocketRole, proxy) -> object:
@@ -145,10 +157,10 @@ class Parser(core_parser.Parser):
             return 0
         return "Not connected."
 
-    def _cmd_ss(self, args: list[str], proxy) -> object:
+    def _cmd_s2s(self, args: list[str], proxy) -> object:
         return self._aux_cmd_send_string(args, ESocketRole.server, proxy)
 
-    def _cmd_cs(self, args: list[str], proxy) -> object:
+    def _cmd_s2c(self, args: list[str], proxy) -> object:
         return self._aux_cmd_send_string(args, ESocketRole.client, proxy)
 
     def _aux_cmd_send_string(self, args: list[str], target: ESocketRole, proxy) -> object:
@@ -165,10 +177,10 @@ class Parser(core_parser.Parser):
             return 0
         return "Not connected."
 
-    def _cmd_sf(self, args: list[str], proxy) -> object:
+    def _cmd_f2s(self, args: list[str], proxy) -> object:
         return self._aux_cmd_send_file(args, ESocketRole.server, proxy)
 
-    def _cmd_cf(self, args: list[str], proxy) -> object:
+    def _cmd_f2c(self, args: list[str], proxy) -> object:
         return self._aux_cmd_send_file(args, ESocketRole.client, proxy)
 
     def _aux_cmd_send_file(self, args: list[str], target: ESocketRole, proxy) -> object:
@@ -194,7 +206,7 @@ class Parser(core_parser.Parser):
             return 0
         return "Not connected."
 
-    def _cmd_hexdump(self, args: list[str], proxy) -> object:
+    def _cmd_hexdump(self, args: list[str], _) -> object:
         if len(args) > 4:
             print(self.getHelpText(args[0]))
             return "Syntax error."
