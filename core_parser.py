@@ -95,6 +95,7 @@ class Parser():
         ret['help']         = (self._cmd_help, 'Print available commands. Or the help of a specific command.\nUsage: {0} [command]', [self._commandCompleter, None])
         ret['quit']         = (self._cmd_quit, 'Stop the proxy and quit.\nUsage: {0}', None)
         ret['select']       = (self._cmd_select, 'Select a different proxy to give commands to.\nUsage: {0} ID\nNote: Use \"lsproxy\" to figure out the ID.', [self._proxyNameCompleter, None])
+        ret['deselect']     = (self._cmd_deselect, 'Deselect the currently selected proxy.\nUsage: {0}', None)
         ret['lsproxy']      = (self._cmd_lsproxy, 'Display all configured proxies and their status.\nUsage: {0}', None)
         ret['clearhistory'] = (self._cmd_clearhistory, 'Clear the command history or delete one entry of it.\nUsage: {0} [historyIndex].\nNote: The history file will instantly be overwritten.', None)
         ret['lshistory']    = (self._cmd_lshistory, 'Show the command history or display one entry of it.\nUsage: {0} [historyIndex]', None)
@@ -164,6 +165,14 @@ class Parser():
         except IndexError as e:
             return f"Unable to select proxy {args[1]}: {e}"
         
+        return 0
+
+    def _cmd_deselect(self, args: list[str], proxy) -> object:
+        if len(args) > 1:
+            print(self.getHelpText(args[0]))
+            return "Syntax error."
+        
+        self.application.selectProxy(None)
         return 0
 
     def _cmd_lsproxy(self, args: list[str], proxy) -> object:
@@ -259,6 +268,10 @@ class Parser():
             print(f"{settingKey.name}: {value}")
             return 0
         
+        if len(self.getSettingKeys()) == 0:
+            print(f'There are no settings for this parser.')
+            return 0
+
         # Print them all
         longestKeyLength = max(len(str(x)) for x in self.getSettingKeys())
 

@@ -4,7 +4,6 @@ from dynamic_loader import DynamicLoader
 # This class holds parser items imported from module name.
 # When the parser is requested from this class, it will be reloaded if required
 
-# pylint: disable=too-few-public-methods
 class ParserContainer():
     def __init__(self, moduleName: str, application):
         self.application = application

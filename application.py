@@ -12,7 +12,6 @@ except ImportError:
 
 from proxy import Proxy
 from parser_container import ParserContainer
-import core_parser as Parser
 
 class Application():
     def __init__(self):
@@ -131,17 +130,20 @@ class Application():
     def getSelectedProxy(self) -> Proxy:
         return self.getProxyByName(self.selectedProxyName)
 
-    def getSelectedParser(self) -> Parser.Parser:
+    def getSelectedParser(self):
         proxy = self.getSelectedProxy()
         return self.getParserByProxy(proxy)
 
     def getProxyByName(self, name: str) -> Proxy:
+        if name is None:
+            return None
+
         return self.proxies[name]
 
-    def getParserByProxy(self, proxy: Proxy) -> Parser.Parser:
+    def getParserByProxy(self, proxy: Proxy):
         return self.parsers[proxy].getInstance()
 
-    def getParserByProxyName(self, name: str) -> Parser.Parser:
+    def getParserByProxyName(self, name: str):
         proxy = self.getProxyByName(name)
         return self.getParserByProxy(proxy)
 

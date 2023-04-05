@@ -14,7 +14,8 @@ class DynamicLoader:
         self.originHash: bytes = None
         self.moduleSpec = None
         self.module = None
-        self.reloadModule()
+
+        self.loadModule()
 
     def checkNeedsReload(self) -> bool:
         if self.moduleSpec is None or self.module is None or self.originHash is None:
@@ -35,13 +36,18 @@ class DynamicLoader:
     def getModule(self):
         return self.module
 
-    def reloadModule(self):
+    def loadModule(self):
         self.moduleSpec = importlib.util.find_spec(self.moduleName)
         if self.moduleSpec is None:
             raise ImportError(f'Module {self.moduleName} not found.')
         self.module = importlib.import_module(self.moduleSpec.name)
         self.originHash = self.calculateFileHash()
         return
+
+    def reloadModule(self):
+        # print(f'Reload called on {self.moduleSpec}')
+        importlib.reload(self.module)
+        self.originHash = self.calculateFileHash()
 
     def calculateFileHash(self) -> bytes:
         BUFF_SIZE = 4096
