@@ -5,14 +5,12 @@
 # Only the Parser.settings dictionary is stored persistently.
 # If the module gets reloaded, every other variable
 # that is stored in the class instance will get reset
-# If you need to store something you simply need to
-# - read and write to/from setting[yourkey]
-# this will not show up in the lssettings command output
-#
-# If you want to have default values you need to:
+# If you want to store values you need to:
 # - create a key in ESettingKey
 # - assign a default value in getDefaultSettings
 # - create commands that read/write to settings[yourKey]
+# Removing a key from ESettingKey will cause
+# that key to be deleted on the next module reload.
 
 
 from enum import Enum, auto
