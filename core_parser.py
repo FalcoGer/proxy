@@ -100,7 +100,7 @@ class Parser():
         ret = {}
         ret['help']         = (self._cmd_help, 'Print available commands. Or the help of a specific command.\nUsage: {0} [command]', [self._commandCompleter, None])
         ret['quit']         = (self._cmd_quit, 'Stop the proxy and quit.\nUsage: {0}', None)
-        ret['select']       = (self._cmd_select, f'Select a different proxy to give commands to.\nUsage: {{0}} <Proxy>\n{proxySelectionNote}.', [self._proxyNameCompleter, None])
+        ret['select']       = (self._cmd_select, f'Select a different proxy to give commands to.\nUsage: {{0}} <Proxy>\n{proxySelectionNote}', [self._proxyNameCompleter, None])
         ret['deselect']     = (self._cmd_deselect, 'Deselect the currently selected proxy.\nUsage: {0}', None)
         ret['new']          = (self._cmd_new, 'Create a new proxy.\nUsage: {0} <LocalPort> <RemotePort> <host> [<ProxyName>] [<ParserModule>]', [self._historyCompleter, self._historyCompleter, self._historyCompleter, self._historyCompleter, self._parserNameCompleter, None])
         ret['kill']         = (self._cmd_kill, f'Stop a proxy.\nUsage: {{0}} [<Proxy>]\nIf Proxy is omitted, this kills the currently selected proxy.\n{proxySelectionNote}', [self._proxyNameCompleter])
