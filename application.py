@@ -111,7 +111,7 @@ class Application():
                 
                 # Expand variable substitution
                 try:
-                    variableExpandedCmd = self.expandVariableCommand(cmd)
+                    variableExpandedCmd = self.expandVariableCommand(historyExpandedCmd)
                 except KeyError as e:
                     print(f"Error during variable expansion: {e}")
                     continue
