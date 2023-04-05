@@ -5,6 +5,8 @@ Do:
 - allow running of scripts from file
     command run file
 
+- docstrings for all functions, modules and classes
+
 Fix:
 - Latest command not part of history
 - clearhistory <id> not working
