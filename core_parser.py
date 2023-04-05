@@ -9,6 +9,7 @@ import os
 from enum import Enum, auto
 from copy import copy
 
+from eSocketRole import ESocketRole
 from completer import Completer
 
 ###############################################################################
@@ -99,6 +100,7 @@ class Parser():
         ret['quit']         = (self._cmd_quit, 'Stop the proxy and quit.\nUsage: {0}', None)
         ret['select']       = (self._cmd_select, 'Select a different proxy to give commands to.\nUsage: {0} ID\nNote: Use \"lsproxy\" to figure out the ID.', [self._proxyNameCompleter, None])
         ret['deselect']     = (self._cmd_deselect, 'Deselect the currently selected proxy.\nUsage: {0}', None)
+        ret['loadparser']   = (self._cmd_loadparser, 'Load a custom parser for proxy.\nUsage: {0} proxyname parsername\nExample: {0} PROXY_8080 example_parser', [self._proxyNameCompleter, self._parserNameCompleter, None])
         ret['lsproxy']      = (self._cmd_lsproxy, 'Display all configured proxies and their status.\nUsage: {0}', None)
         ret['clearhistory'] = (self._cmd_clearhistory, 'Clear the command history or delete one entry of it.\nUsage: {0} [historyIndex].\nNote: The history file will instantly be overwritten.', None)
         ret['lshistory']    = (self._cmd_lshistory, 'Show the command history or display one entry of it.\nUsage: {0} [historyIndex]', None)
@@ -176,6 +178,22 @@ class Parser():
             return "Syntax error."
         
         self.application.selectProxy(None)
+        return 0
+
+    def _cmd_loadparser(self, args: list[str], proxy) -> object:
+        if len(args) != 3:
+            print(self.getHelpText(args[0]))
+            return "Syntax error."
+        proxyName = args[1]
+        parserName = args[2]
+
+        try:
+            self.application.setParserForProxyByName(proxyName, parserName)
+        except ImportError as e:
+            return f'Could not load {parserName}: {e}'
+        except KeyError as e:
+            return f'Could not find {proxyName}: {e}'
+            
         return 0
 
     def _cmd_lsproxy(self, args: list[str], proxy) -> object:
@@ -630,7 +648,7 @@ class Parser():
         word = self.completer.words[self.completer.getWordIdx()]
 
         # Find which directory we are in
-        directory = "./"
+        directory = os.curdir + "/"
         filenameStart = ""
         if word:
             # There is at least some text being completed.
@@ -684,8 +702,54 @@ class Parser():
                 self.completer.candidates.append(proxyName)
         return
 
+    def _parserNameCompleter(self) -> None:
+        FILE_SIZE_LIMIT_FOR_CHECK = 50 * (2 ** 10) # 50 KiB
+        # find all files in directory
+        for fileName in os.listdir(os.curdir):
+            isCandidate = False
+            try:
+                if not fileName.startswith(self.completer.being_completed):
+                    # Skip filenames that don't match.
+                    continue
+
+                if not fileName.endswith(".py"):
+                    # Skip non python modules
+                    continue
+                
+                if os.path.getsize(fileName) > FILE_SIZE_LIMIT_FOR_CHECK:
+                    # Skip files that are too large to check
+                    continue
+
+                with open(fileName, "rt") as file:
+                    # Find the "class Parser(" string in the file
+                    # Need to do it in steps because there may be any number of whitespaces
+                    while line := file.readline():
+                        line = line.strip()
+                        if not line.startswith('class'):
+                            continue
+                        line = line[len('class'):].strip()
+                        if not line.startswith('Parser'):
+                            continue
+                        line = line[len('Parser'):].strip()
+                        if not line.startswith('('):
+                            continue
+                        isCandidate = True
+                        break
+            except (IOError, PermissionError, IsADirectoryError) as e:
+                continue
+            
+            if not isCandidate:
+                # Check next file
+                continue
+            
+            self.completer.candidates.append(fileName[:-3])
+        return
+
     ###############################################################################
     # No need to edit the functions below
+
+    def parse(self, data: bytes, proxy, origin: ESocketRole) -> None:
+        raise RuntimeError('Core parser is not meant to parse packets. Use derived parser instead.')
 
     # This function take the command line string and calls the relevant python function with the correct arguments.
     def handleUserInput(self, userInput: str, proxy) -> object:

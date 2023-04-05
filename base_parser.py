@@ -48,7 +48,8 @@ class Parser(core_parser.Parser):
         return
 
     def __str__(self) -> str:
-        return "BASE"
+        # The base parser doesn't forward packets, so using it would drop them all.
+        return "DROP"
     
     # Return a list of setting keys. Make sure to also include the base classes keys.
     def getSettingKeys(self) -> list[Enum]:

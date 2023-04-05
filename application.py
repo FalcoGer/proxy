@@ -53,7 +53,7 @@ class Application():
         for localPort, remotePort in zip([x[0] for x in args.port], [x[1] for x in args.port]):
             name = f'PROXY_{localPort}'
             proxy = Proxy(self, args.bind, args.remote, localPort, remotePort, name)
-            parser = ParserContainer('base_parser', self)
+            parser = ParserContainer('passthrough_parser', self)
             self.proxies[name] = proxy
             self.parsers[proxy] = parser
             proxy.start()
@@ -146,6 +146,11 @@ class Application():
     def getParserByProxyName(self, name: str):
         proxy = self.getProxyByName(name)
         return self.getParserByProxy(proxy)
+
+    def setParserForProxyByName(self, proxyName, parserName) -> None:
+        proxy = self.getProxyByName(proxyName)
+        newParser = ParserContainer(parserName, self)
+        self.parsers[proxy] = newParser
 
     def selectProxy(self, name: str) -> None:
         if name is not None and name not in self.proxies:
