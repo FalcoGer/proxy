@@ -103,11 +103,18 @@ class Application():
                     continue
 
                 # Expand !<histIdx>
-                historyExpandedCmd = self.expandHistoryCommand(cmd)
+                try:
+                    historyExpandedCmd = self.expandHistoryCommand(cmd)
+                except (ValueError, IndexError) as e:
+                    print(f"Error during history expansion: {e}")
+                    continue
                 
                 # Expand variable substitution
                 try:
                     variableExpandedCmd = self.expandVariableCommand(cmd)
+                except KeyError as e:
+                    print(f"Error during variable expansion: {e}")
+                    continue
                 finally:
                     # add to the history either way.
                     self.addToHistory(historyExpandedCmd)
@@ -326,7 +333,7 @@ class Application():
             if word.startswith("!"):
                 histIdx = int(word[1:]) # Let it throw ValueError to notify user.
                 if not 0 <= histIdx < readline.get_current_history_length():
-                    raise ValueError(f"History index {histIdx} is out of range.")
+                    raise IndexError(f"History index {histIdx} is out of range.")
                 
                 historyItem = readline.get_history_item(histIdx)
                 if historyItem is None:
