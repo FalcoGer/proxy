@@ -326,11 +326,11 @@ class Application():
             if word.startswith("!"):
                 histIdx = int(word[1:]) # Let it throw ValueError to notify user.
                 if not 0 <= histIdx < readline.get_current_history_length():
-                    raise ValueError("History index {histIdx} is out of range.")
+                    raise ValueError(f"History index {histIdx} is out of range.")
                 
                 historyItem = readline.get_history_item(histIdx)
                 if historyItem is None:
-                    raise ValueError("History index {histIdx} points to invalid history entry.")
+                    raise ValueError(f"History index {histIdx} points to invalid history entry.")
                 
                 words[idx] = historyItem
             idx += 1
