@@ -155,7 +155,11 @@ class Proxy(Thread):
             self.server = None
 
         # Set new client
-        self.client = SocketHandler(sock, ESocketRole.client, self)
+        try:
+            self.client = SocketHandler(sock, ESocketRole.client, self)
+        except (OSError, TimeoutError) as e:
+            print(f"[{self}] New client tried to connect but exception occured: {e}")
+            return False
         return True
     
     def connect(self) -> bool:

@@ -46,6 +46,9 @@ class Parser(core_parser.Parser):
     def __init__(self, application, settings: dict[(Enum, object)]):
         super().__init__(application, settings)
         return
+
+    def __str__(self) -> str:
+        return "BASE"
     
     # Return a list of setting keys. Make sure to also include the base classes keys.
     def getSettingKeys(self) -> list[Enum]:

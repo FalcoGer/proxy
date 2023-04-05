@@ -44,7 +44,13 @@ class ESettingKey(Enum):
     def __hash__(self):
         return self.value.__hash__()
 
+# Class name must be Parser
 class Parser(base_parser.Parser):
+    
+    # Define the parser name here as it should appear in the prompt
+    def __str__(self) -> str:
+        return "Example"
+
     # Use this to set sensible defaults for your stored variables.
     def getDefaultSettings(self) -> dict[(Enum, object)]:
         defaultSettings = super().getDefaultSettings()

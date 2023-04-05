@@ -115,7 +115,7 @@ class Application():
         return
 
     def getPromptString(self) -> str:
-        return f'[{self.getSelectedProxy()}] $ '
+        return f'[{self.getSelectedProxy()}] {self.getSelectedParser()}> '
 
     def addToHistory(self, command: str) -> None:
         # FIXME: For some reason history completion is not available on the last item sent.

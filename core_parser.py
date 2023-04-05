@@ -37,6 +37,9 @@ class ECoreSettingKey(Enum):
         return self.value.__hash__()
 
 class Parser():
+    def __str__(self) -> str:
+        return 'CORE'
+
     def __init__(self, application, settings: dict[(Enum, object)]):
         self.application = application
         self.completer = Completer(application, self)
