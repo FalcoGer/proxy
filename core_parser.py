@@ -36,7 +36,7 @@ class ECoreSettingKey(Enum):
     def __hash__(self):
         return self.value.__hash__()
 
-class CoreParser():
+class Parser():
     def __init__(self, application, settings: dict[(Enum, object)]):
         self.application = application
         self.completer = Completer(application, self)
@@ -571,15 +571,15 @@ class CoreParser():
         return
 
     def _packDataTypeCompleter(self) -> None:
-        options = self.aux_pack_getDataTypeMapping().keys()
+        options = self._aux_pack_getDataTypeMapping().keys()
         for option in options:
             if option.startswith(self.completer.being_completed):
                 self.completer.candidates.append(option)
         return
 
     def _packFormatCompleter(self) -> None:
-        formatMapping = self.aux_pack_getFormatMapping()
-        dataTypeMapping = self.aux_pack_getDataTypeMapping()
+        formatMapping = self._aux_pack_getFormatMapping()
+        dataTypeMapping = self._aux_pack_getDataTypeMapping()
         # 'n' and 'N' only available in native.
         nativeOnlyList = list(filter(lambda x: dataTypeMapping[x] in ['n', 'N'], dataTypeMapping.keys()))
         

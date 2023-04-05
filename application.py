@@ -10,12 +10,9 @@ try:
 except ImportError:
     import readline
 
-# This allows live reloading of modules
-import importlib
-
 from proxy import Proxy
-
-import custom_parser as Parser
+from parser_container import ParserContainer
+import core_parser as Parser
 
 class Application():
     def __init__(self):
@@ -24,7 +21,7 @@ class Application():
         self.HISTORY_FILE = "history.log"
         self.selectedProxyName: str = None
         self.proxies: dict[(str, Proxy)] = {}
-        self.parsers: dict[(Proxy, Parser.CustomParser)] = {}
+        self.parsers: dict[(Proxy, ParserContainer)] = {None: ParserContainer('core_parser', self)}
         
         # parse command line arguments.
         arg_parser = argparse.ArgumentParser(description='Create multiple proxy connections. Provide multiple port parameters to create multiple proxies.')
@@ -57,7 +54,7 @@ class Application():
         for localPort, remotePort in zip([x[0] for x in args.port], [x[1] for x in args.port]):
             name = f'PROXY_{localPort}'
             proxy = Proxy(self, args.bind, args.remote, localPort, remotePort, name)
-            parser = Parser.CustomParser(self, {})
+            parser = ParserContainer('base_parser', self)
             self.proxies[name] = proxy
             self.parsers[proxy] = parser
             proxy.start()
@@ -70,21 +67,6 @@ class Application():
         # Accept user input and parse it.
         while self.running:
             try:
-                for proxy, parser in self.parsers.items():
-                    mustReload = True # TODO: make better check
-                    if mustReload:
-                        # Save the settings before reloading
-                        parserSettings = parser.settings
-                        importlib.reload(Parser)
-
-                        # Create new parser with the old settings
-                        # TODO: create the same parser type as the last one
-                        newParser = Parser.CustomParser(self, parserSettings)
-                        self.parsers[proxy] = newParser
-
-                        # Reload completer if the new parser is the one in use.
-                        if self.getSelectedProxy() == proxy:
-                            readline.set_completer(newParser.completer.complete)
                 try:
                     print() # Empty line
                     cmd = None
@@ -149,22 +131,22 @@ class Application():
     def getSelectedProxy(self) -> Proxy:
         return self.getProxyByName(self.selectedProxyName)
 
-    def getSelectedParser(self) -> Parser.CustomParser:
+    def getSelectedParser(self) -> Parser.Parser:
         proxy = self.getSelectedProxy()
         return self.getParserByProxy(proxy)
 
     def getProxyByName(self, name: str) -> Proxy:
         return self.proxies[name]
 
-    def getParserByProxy(self, proxy: Proxy) -> Parser.CustomParser:
-        return self.parsers[proxy]
+    def getParserByProxy(self, proxy: Proxy) -> Parser.Parser:
+        return self.parsers[proxy].getInstance()
 
-    def getParserByProxyName(self, name: str) -> Parser.CustomParser:
+    def getParserByProxyName(self, name: str) -> Parser.Parser:
         proxy = self.getProxyByName(name)
         return self.getParserByProxy(proxy)
 
     def selectProxy(self, name: str) -> None:
-        if name not in self.proxies:
+        if name is not None and name not in self.proxies:
             raise KeyError(f"{name} is not a valid proxy name.")
         self.selectedProxyName = name
         # reload the correct completer
@@ -235,6 +217,7 @@ class Application():
         return historyExpandedCmd
 
     def expandVariableCommand(self, cmd: str) -> str:
+        # TODO: allow for $(varname) format
         words = cmd.split(' ')
         idx = 0
         word = None

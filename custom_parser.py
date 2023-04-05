@@ -1,15 +1,16 @@
 # This file contains the user defined parser commands and functionality
 
+from enum import Enum, auto
+
 # struct is used to decode bytes into primitive data types
 # https://docs.python.org/3/library/struct.html
 import struct
-from enum import Enum, auto
 
 # Allows pretty printing of bytes in a hexdump format
 from hexdump import Hexdump
 
 # This is the base class for the custom parser class
-from base_parser import BaseParser
+import base_parser
 
 # import stuff for API calls
 from eSocketRole import ESocketRole
@@ -43,7 +44,7 @@ class ESettingKey(Enum):
     def __hash__(self):
         return self.value.__hash__()
 
-class CustomParser(BaseParser):
+class Parser(base_parser.Parser):
     # Use this to set sensible defaults for your stored variables.
     def getDefaultSettings(self) -> dict[(Enum, object)]:
         defaultSettings = super().getDefaultSettings()
@@ -102,7 +103,7 @@ class CustomParser(BaseParser):
 
     def _cmd_example(self, args: list[str], proxy) -> object:
         if len(args) != 3:
-            print(self._getHelpText(args[0]))
+            print(self.getHelpText(args[0]))
             return "Syntax error."
         
         dataStr = str(self.getSetting(ESettingKey.EXAMPLE_SETTING))

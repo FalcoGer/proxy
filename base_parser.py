@@ -6,17 +6,15 @@
 import struct
 import os
 from enum import Enum, auto
-from copy import copy
 
 # This is the base class for the base parser
-from core_parser import CoreParser
+import core_parser
 
 from eSocketRole import ESocketRole
 from hexdump import Hexdump
-from completer import Completer
 
 ###############################################################################
-# Setting storage stuff goes here.
+# Define which settings are available here.
 
 class EBaseSettingKey(Enum):
     HEXDUMP_ENABLED             = auto()
@@ -44,16 +42,18 @@ class EBaseSettingKey(Enum):
     def __hash__(self):
         return self.value.__hash__()
 
-class BaseParser(CoreParser):
+class Parser(core_parser.Parser):
     def __init__(self, application, settings: dict[(Enum, object)]):
         super().__init__(application, settings)
         return
-
+    
+    # Return a list of setting keys. Make sure to also include the base classes keys.
     def getSettingKeys(self) -> list[Enum]:
         settingKeys = super().getSettingKeys()
         settingKeys.extend(list(EBaseSettingKey))
         return settingKeys
-
+    
+    # Define the defaults for each setting here.
     def getDefaultSettings(self) -> dict[(Enum, object)]:
         defaultSettings = super().getDefaultSettings()
         baseDefaultSettings = {

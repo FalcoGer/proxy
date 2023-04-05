@@ -1,4 +1,5 @@
 from enum import Enum, auto
+from typing import Union
 
 _COLOR_AVAILABLE = False
 
@@ -12,8 +13,9 @@ class ERepresentation(Enum):
     HEX = auto()
     PRINTABLE = auto()
 
+AttrType = Union[None, list[str], tuple[list[str]], tuple[list[str], list[str]]]
 class ColorSetting:
-    def __init__(self, fg: str = None, bg: str = None, hexAttributes: tuple[list[str], list[str]] = None, printableAttributes: tuple[list[str], list[str]] = None):
+    def __init__(self, fg: str = None, bg: str = None, hexAttributes: AttrType = None, printableAttributes: AttrType = None):
         self.setFg(fg)
         self.setBg(bg)
         self.setHexAttributes(hexAttributes)
@@ -51,7 +53,7 @@ class ColorSetting:
         self.bg = bg
         return
     
-    def checkAttributes(self, attributes: tuple[list[str], list[str]]) -> tuple[list[str], list[str]]:
+    def checkAttributes(self, attributes: AttrType):
         if attributes is None:
             return None
         
