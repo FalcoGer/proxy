@@ -12,3 +12,5 @@ Fix:
 - clearhistory <id> not working
 - pack/unpack c_string and pascal_string not working right
 - no prompt after parser output
+- file completion not working with filenames with spaces
+
