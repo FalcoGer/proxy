@@ -90,7 +90,6 @@ class ColorSetting:
         return f'ColorSetting: {self.fg=}, {self.bg=}, {self.hexAttributes=}, {self.printableAttributes=}'
 
     def colorize(self, dataStr: str, isEven: bool = False, representation: ERepresentation = ERepresentation.HEX) -> str:
-        global _COLOR_AVAILABLE
         if not _COLOR_AVAILABLE:
             return dataStr
 
@@ -168,7 +167,6 @@ class Hexdump():
         # Special case is the backslash since it's representation string is "'\\\\'" (len 6)
         self.REPRESENTATION_ARRAY = ''.join([(len(repr(chr(b))) == 3 or repr(chr(b)) == '\'\\\\\'') and chr(b) or self.sep for b in range(256)])
 
-        global _COLOR_AVAILABLE
         if not _COLOR_AVAILABLE:
             self.colorSettings = None
         else:
