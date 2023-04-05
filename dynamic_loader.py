@@ -1,9 +1,6 @@
-# This class loads a class from a module dynamically
-# When this class is requested it is checked if it needs to be reloaded
-# Example:
-# dyn_loader = DynamicLoader("module_name", "MyClass")
-# classInstance = dyn_loader.getModule().dyn_class(ctor_arg1, ...)
-# classInstance.classMethod(arg1, ...)
+# This class loads a module dynamically
+# It provides a facility to check if it needs to
+# be reloaded and a function to actually reload it.
 
 import importlib
 import hashlib
