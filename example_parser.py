@@ -8,7 +8,7 @@
 # If you want to store values you need to:
 # - create a key in ESettingKey
 # - assign a default value in getDefaultSettings
-# - create commands that read/write to settings[yourKey]
+# - use the setSetting(key, value) and getSetting(key) functions
 # Removing a key from ESettingKey will cause
 # that key to be deleted on the next module reload.
 
