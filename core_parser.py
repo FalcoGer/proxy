@@ -57,7 +57,7 @@ class Parser():
             self.settings.pop(settingKey) 
 
     def getSettingKeys(self) -> list[Enum]:
-        return list(ECoreSettingKey)
+        return list(self.settings.keys())
 
     def getDefaultSettings(self) -> dict[(Enum, object)]:
         return {

@@ -50,21 +50,22 @@ class Parser(core_parser.Parser):
     def __str__(self) -> str:
         # The base parser doesn't forward packets, so using it would drop them all.
         return "DROP"
-    
+
     # Return a list of setting keys. Make sure to also include the base classes keys.
     def getSettingKeys(self) -> list[Enum]:
         settingKeys = super().getSettingKeys()
         settingKeys.extend(list(EBaseSettingKey))
         return settingKeys
-    
+
     # Define the defaults for each setting here.
     def getDefaultSettings(self) -> dict[(Enum, object)]:
-        defaultSettings = super().getDefaultSettings()
         baseDefaultSettings = {
                 EBaseSettingKey.HEXDUMP_ENABLED: True,
                 EBaseSettingKey.HEXDUMP: Hexdump(),
                 EBaseSettingKey.PACKETNOTIFICATION_ENABLED: True,
             }
+        # Return the base class defaults as well
+        defaultSettings = super().getDefaultSettings()
         return defaultSettings | baseDefaultSettings
 
     ###############################################################################

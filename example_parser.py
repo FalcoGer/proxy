@@ -1,4 +1,19 @@
-# This file contains the user defined parser commands and functionality
+# This file contains the user defined parser commands and functionality.
+# Use it as a template for your own stuff.
+
+# WARNING:
+# Only the Parser.settings dictionary is stored persistently.
+# If the module gets reloaded, every other variable
+# that is stored in the class instance will get reset
+# If you need to store something you simply need to
+# - read and write to/from setting[yourkey]
+# this will not show up in the lssettings command output
+#
+# If you want to have default values you need to:
+# - create a key in ESettingKey
+# - assign a default value in getDefaultSettings
+# - create commands that read/write to settings[yourKey]
+
 
 from enum import Enum, auto
 
@@ -7,6 +22,9 @@ from enum import Enum, auto
 import struct
 
 # Allows pretty printing of bytes in a hexdump format
+# One such class instance is available in the base parser settings.
+# But you might want to make your own
+# instance for your custom configuration
 from hexdump import Hexdump
 
 # This is the base class for the custom parser class
@@ -18,7 +36,7 @@ from eSocketRole import ESocketRole
 # For more examples of commands, completers and api calls check core and base parser file.
 
 ###############################################################################
-# Setting storage stuff goes here.
+# Create keys for settings that should have a default value here.
 
 class ESettingKey(Enum):
     EXAMPLE_SETTING = auto()
@@ -53,10 +71,12 @@ class Parser(base_parser.Parser):
 
     # Use this to set sensible defaults for your stored variables.
     def getDefaultSettings(self) -> dict[(Enum, object)]:
-        defaultSettings = super().getDefaultSettings()
         userDefaultSettings = {
                 ESettingKey.EXAMPLE_SETTING: 'ExAmPlE'
             }
+        
+        # Make sure to include the base class settings as well.
+        defaultSettings = super().getDefaultSettings()
         return defaultSettings | userDefaultSettings
 
     ###############################################################################
@@ -106,8 +126,13 @@ class Parser(base_parser.Parser):
 
     ###############################################################################
     # Command callbacks go here.
-
+    
+    # If a command doesn't need to know which proxy it is
+    # working on, simply use "_" as the third argument name
+    
+    # Sends the example setting string a few times to the client.
     def _cmd_example(self, args: list[str], proxy) -> object:
+        # args: transformation, count
         if len(args) != 3:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -138,8 +163,9 @@ class Parser(base_parser.Parser):
 
     ###############################################################################
     # Completers go here.
-    # See proxy.py for which values are available in the completer object.
+    # See completer.py for which values are available in the completer object.
     # Append any options you want to be in the auto completion list to completer.candidates
+    # See core_parser.py for examples
 
     def _exampleCompleter(self) -> None:
         options = ["upper", "lower", "as_is"]
@@ -154,9 +180,8 @@ class Parser(base_parser.Parser):
     def __init__(self, application, settings):
         super().__init__(application, settings)
         return
-    
+
     def getSettingKeys(self) -> list[Enum]:
         settingKeys = super().getSettingKeys()
         settingKeys.extend(list(ESettingKey))
         return settingKeys
-
