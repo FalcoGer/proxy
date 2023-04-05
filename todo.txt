@@ -1,6 +1,8 @@
 Do:
-- command to toggle notifications
+- command to toggle notifications in base_parser
+
 - variable expansion format $(varname) as well as $varname
+    completer also must work with this, even $(var1)$(va [TAB] should complete.
 
 - allow starting proxies from CLI
     command create name remotehost localport remoteport
@@ -9,21 +11,6 @@ Do:
 - allow stopping proxies from CLI
     command kill [name] - if name empty, kill current and select first
     make sure either always 1 active or some form of fallback is in place if no proxies exist
-
-- add multi parser support
-    load from files, reload them smartly (when file changed)
-        REF: imp module!
-        REF: https://www.geeksforgeeks.org/how-to-dynamically-load-modules-or-classes-in-python/
-    reload them even if currently selected proxy doesn't use them
-    parser container class that stores the module parser and offers functions to reload
-        __init__(moduleName)
-        type checking with isinstance()? maybe impossible or only via black magic.
-        update getParser functions in application
-        update default parser to be base parser
-    command loadparser filename
-    use core parser if no proxies exist
-
-- make a better check for when to reload the Parser module in application.py
 
 - allow running of scripts from file
     command run file
@@ -35,10 +22,9 @@ Do:
       d[newKey] = d.pop(oldKey)
     make sure that a proxy with that name doesn't exist already
 
-- allow selecting proxies by binding port
-
-- make internal variables and functions private with _
-    provide getters and setters with proper checks
+- allow selecting proxies by ID and binding port
+  command select proxyname|ID|Port
+    ID goes first if both port and ID exist (unlikely)
 
 Fix:
 - Latest command not part of history
