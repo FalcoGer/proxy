@@ -86,8 +86,7 @@ class Parser(core_parser.Parser):
             ts = time.time() - self.application.START_TIME
             tsStr = f'{ts:>14.8f}'
             
-            maxProxyNameLen = max(len(proxy.name) for proxy in self.application.proxies.values())
-            proxyStr = proxy.name.ljust(maxProxyNameLen)
+            proxyStr = f'{proxy.name} ({self.application.getParserByProxy(proxy)})'
             
             pktNrStr = f'[PKT# {pktNr}]'
 
