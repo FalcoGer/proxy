@@ -70,6 +70,7 @@ class Parser(core_parser.Parser):
                 EBaseSettingKey.HEXDUMP_ENABLED: True,
                 EBaseSettingKey.HEXDUMP: Hexdump(),
                 EBaseSettingKey.PACKETNOTIFICATION_ENABLED: True,
+                EBaseSettingKey.PACKET_NUMBER: 0
             }
         # Return the base class defaults as well
         return super().getDefaultSettings() | defaultSettings
@@ -79,6 +80,7 @@ class Parser(core_parser.Parser):
 
     # Define what should happen when a packet arrives here
     def parse(self, data: bytes, proxy, origin: ESocketRole) -> None:
+        pktNr = self.getSetting(EBaseSettingKey.PACKET_NUMBER)
         if self.getSetting(EBaseSettingKey.PACKETNOTIFICATION_ENABLED):
             # Print out the data in a nice format.
             ts = time.time() - self.application.START_TIME
@@ -87,7 +89,6 @@ class Parser(core_parser.Parser):
             maxProxyNameLen = max(len(proxy.name) for proxy in self.application.proxies.values())
             proxyStr = proxy.name.ljust(maxProxyNameLen)
             
-            pktNr = self.getSetting(core_parser.ECoreSettingKey.PACKET_NUMBER)
             pktNrStr = f'[PKT# {pktNr}]'
 
             directionStr = "[C -> S]" if origin == ESocketRole.client else "[C <- S]"
@@ -111,7 +112,6 @@ class Parser(core_parser.Parser):
             hexdumpLines = "\n".join(hexdumpObj.hexdump(data))
             print(f"{hexdumpLines}")
         
-        pktNr = self.getSetting(EBaseSettingKey.PACKET_NUMBER)
         pktNr += 1
         self.setSetting(EBaseSettingKey.PACKET_NUMBER, pktNr)
         return
