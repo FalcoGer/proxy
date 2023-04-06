@@ -32,7 +32,7 @@ class ReadlineBufferStatus():
         if self.begin == 0:
             return 0
 
-        if self.begin >= len(self.origline):
+        if self.begin > len(self.origline):
             # readline.get_beginidx only updates when completion is requested
             # return 0 to avoid index error
             return 0
