@@ -109,6 +109,7 @@ class Parser():
         ret['disconnect']   = (self._cmd_disconnect, f'Disconnect from the client and server.\nUsage: {{0}} [<Proxy>]\n{proxySelectionNote}', [self._proxyNameCompleter, None])
         ret['loadparser']   = (self._cmd_loadparser, f'Load a custom parser for proxy.\nUsage: {{0}} [<Proxy>] <ParserName>\nExample: {{0}} PROXY_8080 example_parser\nIf Proxy is omitted, this changes the parser of the currently selected proxy.\n{proxySelectionNote}', [self._proxyNameCompleter, self._parserNameCompleter, None])
         ret['lsproxy']      = (self._cmd_lsproxy, 'Display all configured proxies and their status.\nUsage: {0}', None)
+        ret['run']          = (self._cmd_run, 'Runs a script file.\nUsage: {0} <FilePath> [<LineNumber>]\nIf line number is given, the script will start execution on that line.\nLines starting with "#" will be ignored.', [self._fileCompleter, self._historyCompleter, None])
         ret['clearhistory'] = (self._cmd_clearhistory, 'Clear the command history or delete one entry of it.\nUsage: {0} [<HistoryIndex>].\nNote: The history file will instantly be overwritten.', None)
         ret['lshistory']    = (self._cmd_lshistory, 'Show the command history or display one entry of it.\nUsage: {0} [<HistoryIndex>]', None)
         ret['lssetting']    = (self._cmd_lssetting, 'Show the current settings or display a specific setting.\nUsage: {0} [<SettingName>]', [self._settingsCompleter, None])
@@ -241,6 +242,8 @@ class Parser():
             self.application.createProxy(name, lp, rp, host)
         except (ValueError, KeyError) as e:
             return f"Bad name: {e}"
+        except OSError as e:
+            return f"Could not create proxy: {e}"
 
         try:
             self.application.setParserForProxyByName(name, parserName)
@@ -330,6 +333,53 @@ class Parser():
         for idx, proxy in enumerate(self.application.getProxyList()):
             parser = self.application.getParserByProxy(proxy)
             print(f'[{idx}] - {proxy} ({parser})')
+        return 0
+
+    def _cmd_run(self, args: list[str], _) -> object:
+        if len(args) > 3:
+            print(self.getHelpText(args[0]))
+            return "Syntax error."
+        # args: file, [linenr]
+        filePath = ' '.join(args[1:])
+        firstTryPath = filePath
+        lineNr = 1
+        if not os.path.exists(filePath):
+            filePath = ' '.join(args[1:-1])
+            lineNr = self._strToInt(args[-1])
+            try:
+                if lineNr <= 0:
+                    print(self.getHelpText(args[0]))
+                    raise ValueError('Line number can not be <=0 but was {lineNr}.')
+            except ValueError as e:
+                return "Syntax error: {e}"
+        if not os.path.exists(filePath):
+            return f'Could not locate {repr(firstTryPath)} or {repr(filePath)}.'
+        
+        with open(filePath, "rt", encoding='utf-8') as file:
+            # pop lineNr lines off the buffer
+            for x in range(1, lineNr):
+                line = file.readline()
+                if line is None:
+                    return f"File reached EOF before {lineNr} at line {x}."
+
+            while line := file.readline():
+                # strip leading spaces and trailing new line
+                cmdToExecute = line.lstrip()[:-1]
+                
+                # Expand variable names
+                try:
+                    cmdToExecute = self.application.expandVariableCommand(cmdToExecute)
+                except KeyError as e:
+                    return f"Error during variable expansion at line {lineNr} in {repr(filePath)}: {e}"
+                
+                # execute command
+                try:
+                    cmdReturn = self.application.runCommand(cmdToExecute)
+                except RecursionError as e:
+                    return f"Called self too many times at {lineNr} in {repr(filePath)}: {e}"
+                if cmdReturn != 0:
+                    return f"Error: {cmdReturn} at line {lineNr} in {repr(filePath)}."
+                lineNr += 1
         return 0
 
     def _cmd_quit(self, args: list[str], _) -> object:

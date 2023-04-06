@@ -9,9 +9,6 @@ Do:
 - variable expansion format $(varname) as well as $varname
     completer also must work with this, even $(var1)$(va [TAB] should complete.
 
-- allow running of scripts from file
-    command run file
-
 - docstrings for all functions, modules and classes
 
 - documentation
@@ -19,8 +16,9 @@ Do:
 
 - Make a PwnieIsland: PwnAdventure 3 proxy :)
 
+- Expand scripting with loops and functions and such
+
 Fix:
-- Latest command not part of history
 - clearhistory <id> not working
 - pack/unpack c_string and pascal_string not working right
 - file completion not working with filenames with spaces

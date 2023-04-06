@@ -123,15 +123,13 @@ class Application():
                 finally:
                     # add to the history either way.
                     self.addToHistory(historyExpandedCmd)
-
-                escapedCmd = variableExpandedCmd.replace('\\!', '!').replace('\\$', '$') 
                 
                 # resolve escaped ! and $.
-                if cmd != escapedCmd:
-                    print(f"Expanded: {escapedCmd}")
+                if cmd != variableExpandedCmd:
+                    print(f"Expanded: {variableExpandedCmd}")
 
                 # Handle the command
-                cmdReturn = self.getSelectedParser().handleUserInput(escapedCmd, self.getSelectedProxy())
+                cmdReturn = self.runCommand(variableExpandedCmd) 
                 if cmdReturn != 0:
                     print(f"Error: {cmdReturn}")
             # pylint: disable=broad-except
@@ -148,6 +146,15 @@ class Application():
             
         readline.write_history_file(self._HISTORY_FILE)
         return
+
+    def runCommand(self, cmd: str) -> object:
+        if cmd.strip().startswith('#'):
+            return 0
+        if len(cmd.strip()) == 0:
+            return 0
+
+        cmd = cmd.replace('\\!', '!').replace('\\$', '$')
+        return self.getSelectedParser().handleUserInput(cmd, self.getSelectedProxy())
 
     def getPromptString(self) -> str:
         return f'[{self.getSelectedProxy()}] {self.getSelectedParser()}> '
