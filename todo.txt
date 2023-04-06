@@ -7,6 +7,8 @@ Do:
 
 - docstrings for all functions, modules and classes
 
+- make all readline module changes through function calls to application instead of getting readline
+
 Fix:
 - Latest command not part of history
 - clearhistory <id> not working
