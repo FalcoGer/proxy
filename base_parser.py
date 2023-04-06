@@ -99,7 +99,7 @@ class Parser(core_parser.Parser):
                 proxyStr = termcolor.colored(proxyStr, 'green', None, ['bold'])
                 pktNrStr = termcolor.colored(pktNrStr, 'yellow', None)
                 if origin == ESocketRole.client:
-                    directionStr = termcolor.colored(directionStr, 'white', 'on_blue')
+                    directionStr = termcolor.colored(directionStr, 'white', 'on_blue', ['bold'])
                 else:
                     directionStr = termcolor.colored(directionStr, 'white', 'on_magenta')
                 dataLenStr = termcolor.colored(dataLenStr, 'green', None, ['bold'])
