@@ -160,7 +160,6 @@ class Application():
         return f'[{self.getSelectedProxy()}] {self.getSelectedParser()}> '
 
     def addToHistory(self, command: str) -> None:
-        # FIXME: For some reason history completion is not available on the last item sent.
         lastHistoryItem = readline.get_history_item(readline.get_current_history_length())
         # Add the item to the history if not already in it.
         if command != lastHistoryItem and len(command) > 0:
@@ -398,20 +397,18 @@ class Application():
     def getHistoryItem(self, idx: int) -> str:
         if not 0 <= idx < readline.get_history_length():
             raise IndexError(f'{idx} is not a valid history index.')
-        return readline.get_history_item(idx)
+        # for some strange reason get_history_item is 1 based.
+        return readline.get_history_item(idx + 1)
 
     def deleteHistoryItem(self, idx: int) -> None:
         if not 0 <= idx < readline.get_history_length():
             raise IndexError(f'{idx} is not a valid history index.')
-        # FIXME: Doesn't work
+        # for some even stranger reason, remove and replace history item is 0 based!
         readline.remove_history_item(idx)
-
-        readline.write_history_file(self._HISTORY_FILE)
         return
 
     def clearHistory(self) -> None:
         readline.clear_history()
-        readline.write_history_file(self._HISTORY_FILE)
         return
 
     def getCompleterFunction(self):

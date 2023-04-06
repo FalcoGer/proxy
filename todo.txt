@@ -19,7 +19,6 @@ Do:
 - Expand scripting with loops and functions and such
 
 Fix:
-- clearhistory <id> not working
 - pack/unpack c_string and pascal_string not working right
 - file completion not working with filenames with spaces
 - strange behavior when cursor not at end of line when packets are handled
