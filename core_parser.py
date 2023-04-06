@@ -360,6 +360,8 @@ class Parser():
         
         # Print them all.
         for idx, historyLine in enumerate(self.application.getHistoryList()):
+            if historyLine is None:
+                continue
             print(f"{idx} - \"{historyLine}\"")
         return 0
 
@@ -460,11 +462,16 @@ class Parser():
             else:
                 return f"{varName} is not defined."
             return 0
+        
+        variableNames = self.application.getVariableNames()
+        if len(variableNames) == 0:
+            print("No variables defined.")
+            return 0
 
         # print all variables
         maxVarNameLength = max(len(varName) for varName in self.application.getVariableNames())
 
-        for varName in self.application.getVariableNames():
+        for varName in variableNames:
             varValue = self.application.getVariable(varName)
             print(f"{varName.rjust(maxVarNameLength)} - \"{varValue}\"")
         return 0
@@ -534,7 +541,7 @@ class Parser():
         if len(args) != 1:
             print(self.getHelpText(args[0]))
             return "Syntax error."
-        self.application.variables = {}
+        self.application.clearVariables()
         print("All variables deleted.")
         return 0
 
@@ -704,8 +711,15 @@ class Parser():
         else:
             numberString = args[1]
             number = self._strToInt(numberString)
+        
+        # Also get a byte array out of it.
+        hexString = f'{number:2X}'
+        if len(hexString) % 2 == 1:
+            hexString = '0' + hexString
+        byteArray = bytes.fromhex(hexString)
+        
         # print the number
-        print(f"DEC: {number}\nHEX: {hex(number)}\nOCT: {oct(number)}\nBIN: {bin(number)}")
+        print(f"DEC: {number}\nHEX: {hex(number)}\nOCT: {oct(number)}\nBIN: {bin(number)}\nBytes: {byteArray}")
         return 0
 
     ###############################################################################

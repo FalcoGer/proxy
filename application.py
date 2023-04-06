@@ -295,7 +295,7 @@ class Application():
         self.renameProxy(proxy, newName)
         return
     
-    def getVaribleNames(self) -> list[str]:
+    def getVariableNames(self) -> list[str]:
         return list(self._variables)
 
     def getVariable(self, variableName: str) -> str:
@@ -320,6 +320,9 @@ class Application():
 
         self._variables.pop(variableName)
         return True
+
+    def clearVariables(self) -> None:
+        self._variables = {}
 
     def checkVariableName(self, variableName: str) -> bool:
         if len(variableName) == 0:

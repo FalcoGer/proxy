@@ -84,7 +84,7 @@ class Completer():
         # For example if completing "!3" but "!30" and "!31" are also available
         # then return only "!3".
 
-        historyLines = self.application.getHistoryLines()
+        historyLines = self.application.getHistoryList()
         historyIndexes = list(idx for idx, _ in enumerate(historyLines))
 
         if len(rbs.being_completed) > (1 if includePrefix else 0):
