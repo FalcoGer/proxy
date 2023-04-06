@@ -3,5 +3,3 @@
 new 4444 4445 localhost MyProxy example_parser
 select MyProxy
 set httpGet GET / HTTP/1.0\n\n
-
-run examplescript.txt 7
