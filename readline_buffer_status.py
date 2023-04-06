@@ -28,8 +28,11 @@ class ReadlineBufferStatus():
     def _getWordIdx(self) -> int:
         # Which word are we currently completing
         # Words based on spaces, not readline separators
-        wordIdx = 0
 
+        if self.begin == 0:
+            return 0
+
+        wordIdx = 0
         # Walk backwards through the line and count spaces.
         for idx in range(self.begin - 1, -1, -1):
             if self.origline[idx] == ' ':
