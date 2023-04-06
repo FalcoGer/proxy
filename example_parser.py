@@ -1,9 +1,15 @@
 # This file contains the user defined parser commands and functionality.
 # Use it as a template for your own stuff.
 
+# The module will be reloaded as soon as this file has changed on disk
+# and when the module is next requested. This happens when either
+# the parse or handleUserInput function is called from application.
+# The magic happens because the module is stored in a
+# DynamicLoader object. See dynamic_loader.py
+
 # WARNING:
 # Only the Parser.settings dictionary is stored persistently.
-# If the module gets reloaded, every other variable
+# If the module gets reloaded, every other attribute
 # that is stored in the class instance will get reset
 # If you want to store values you need to:
 # - create a key in ESettingKey
