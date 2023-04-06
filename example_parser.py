@@ -92,14 +92,13 @@ class Parser(base_parser.Parser):
     def parse(self, data: bytes, proxy, origin: ESocketRole) -> list[str]:
         output = super().parse(data, proxy, origin)
         
-        # Do interesting stuff with the data here.
-        #if data == b'ABCD\n' and origin == ESocketRole.client:
-        #    data = b'DCBA\n'
-
         # A construct like this may be used to drop packets. 
-        #if data.find(b'\xFF\xFF\xFF\xFF') >= 0:
-        #    output.append("Dropped")
-        #    return output
+        if data.find(b'drop') >= 0:
+            output.append("Dropped")
+            return output
+        
+        # Do interesting stuff with the data here.
+        data = data.replace(b'ding', b'dong')
 
         # By default, send the data to the client/server.
         if origin == ESocketRole.client:
