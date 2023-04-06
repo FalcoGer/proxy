@@ -11,6 +11,7 @@ from copy import copy
 
 from eSocketRole import ESocketRole
 from completer import Completer
+from readline_buffer_status import ReadlineBufferStatus as RBS
 
 ###############################################################################
 # Setting storage stuff goes here.
@@ -44,7 +45,7 @@ class Parser():
     def __init__(self, application, settings: dict[(Enum, object)]):
         self.application = application
         self.completer = Completer(application, self)
-        self.commandDictionary = self.buildCommandDict()
+        self.commandDictionary = self._buildCommandDict()
 
         # Populate settings
         self.settings = settings
@@ -94,7 +95,7 @@ class Parser():
     # The function is called when the command is executed, the string is the help text for that command.
     # The last completer in the completer array will be used for all words if the word index is higher than the index in the completer array.
     # If you don't want to provide more completions, use None at the end.
-    def buildCommandDict(self) -> dict:
+    def _buildCommandDict(self) -> dict:
         proxySelectionNote = "Note: Proxy may be selected by ID, LocalPort or it's name.\nThe ID has preference over LocalPort."
 
         ret = {}
@@ -150,12 +151,16 @@ class Parser():
         # Print
         # Find the longest key for neat formatting.
         maxLen = max(len(key) for key in self.commandDictionary)
-
-        for key in self.commandDictionary:
-            helpText = self.getHelpText(key)
-            helpText = helpText.replace("\n", "\n" + (" " * (maxLen + 4))).strip()
-            print(f"{key.rjust(maxLen)} - {helpText}")
+        termColumns = os.get_terminal_size().columns
+        SPACES_BETWEEN_CMDS = 3
+        maxLen += SPACES_BETWEEN_CMDS
+        maxCmdsPerLine = int(termColumns / maxLen)
+        print() # Make some space.
+        for idx, cmdname in enumerate(self.commandDictionary):
+            print(f'{cmdname.ljust(maxLen)}', end=('' if (idx + 1) % maxCmdsPerLine != 0 else '\n'))
         
+        print("\n\nUse \"help <cmdName>\" to find out more about how to use a command.")
+
         # Print general CLI help also
         print("Readline extensions are available.")
         print("  Use TAB for auto completion")
@@ -322,18 +327,16 @@ class Parser():
             print(self.getHelpText(args[0]))
             return "Syntax error."
 
-        idx = 0
-        
-        for p in self.application.proxies.values():
-            print(f'[{idx}] - {p}')
-            idx += 1
+        for idx, proxy in enumerate(self.application.getProxyList()):
+            parser = self.application.getParserByProxy(proxy)
+            print(f'[{idx}] - {proxy} ({parser})')
         return 0
 
     def _cmd_quit(self, args: list[str], _) -> object:
         if len(args) > 1:
             print(self.getHelpText(args[0]))
             return "Syntax error."
-        self.application.running = False
+        self.application.stop()
         return 0
 
     def _cmd_lshistory(self, args: list[str], _) -> object:
@@ -341,8 +344,6 @@ class Parser():
             print(self.getHelpText(args[0]))
             return "Syntax error."
         
-        readline = self.application.getReadlineModule()
-        
         if len(args) == 2:
             try:
                 idx = self._strToInt(args[1])
@@ -350,21 +351,19 @@ class Parser():
                 print(self.getHelpText(args[0]))
                 return f"Syntax error: {e}"
 
-            if idx < readline.get_current_history_length():
-                historyline = readline.get_history_item(idx)
-                print(f"{idx} - \"{historyline}\"")
+            try:
+                historyLine = self.application.getHistoryItem(idx)
+                print(f"{idx} - \"{historyLine}\"")
                 return 0
-            return f"Invalid history index {idx}."
+            except IndexError as e:
+                return f"Invalid history index {idx}: {e}"
         
         # Print them all.
-        for idx in range(0, readline.get_current_history_length()):
-            historyline = readline.get_history_item(idx)
-            print(f"{idx} - \"{historyline}\"")
+        for idx, historyLine in enumerate(self.application.getHistoryList()):
+            print(f"{idx} - \"{historyLine}\"")
         return 0
 
     def _cmd_clearhistory(self, args: list[str], _) -> object:
-        readline = self.application.getReadlineModule()
-
         if len(args) > 2:
             print(self.getHelpText(args[0]))
             return "Syntax error."
@@ -376,18 +375,16 @@ class Parser():
                 print(self.getHelpText(args[0]))
                 return f"Syntax error: {e}"
 
-            if idx < readline.get_current_history_length():
-                historyline = readline.get_history_item(idx)
-                readline.remove_history_item(idx) # FIXME: Doesn't work?
-                print(f"Item {idx} deleted: {historyline}")
-            else:
-                return f"Invalid history index {idx}"
+            try:
+                historyLine = self.application.getHistoryItem(idx)
+                self.application.deleteHistoryItem(idx)
+                print(f"Item {idx} deleted: {historyLine}")
+                return 0
+            except IndexError as e:
+                return f"Invalid history index {idx}: {e}"
         else:
-            readline.clear_history()
+            self.application.clearHistory()
             print("History deleted.")
-        
-        # Write back the history file.
-        readline.write_history_file(self.application.HISTORY_FILE)
         return 0
 
     def _cmd_lssetting(self, args: list[str], _) -> object:
@@ -457,7 +454,7 @@ class Parser():
         # Print specific variable
         if len(args) == 2:
             varName = args[1]
-            if varName in self.application.variables.keys():
+            if varName in self.application.getVariableNames():
                 varValue = self.application.getVariable(varName)
                 print(f"{varName} - \"{varValue}\"")
             else:
@@ -465,13 +462,9 @@ class Parser():
             return 0
 
         # print all variables
-        maxVarNameLength = 0
-        for varName in self.application.variables.keys():
-            varNameLength = len(varName)
-            if varNameLength > maxVarNameLength:
-                maxVarNameLength = varNameLength
+        maxVarNameLength = max(len(varName) for varName in self.application.getVariableNames())
 
-        for varName in self.application.variables.keys():
+        for varName in self.application.getVariableNames():
             varValue = self.application.getVariable(varName)
             print(f"{varName.rjust(maxVarNameLength)} - \"{varValue}\"")
         return 0
@@ -718,27 +711,27 @@ class Parser():
     ###############################################################################
     # Completers go here.
 
-    def _convertTypeCompleter(self) -> None:
+    def _convertTypeCompleter(self, rbs: RBS) -> None:
         options = ['dec', 'bin', 'oct', 'hex']
         for option in options:
-            if option.startswith(self.completer.being_completed):
+            if option.startswith(rbs.being_completed):
                 self.completer.candidates.append(option)
         return
 
-    def _packDataTypeCompleter(self) -> None:
+    def _packDataTypeCompleter(self, rbs: RBS) -> None:
         options = self._aux_pack_getDataTypeMapping().keys()
         for option in options:
-            if option.startswith(self.completer.being_completed):
+            if option.startswith(rbs.being_completed):
                 self.completer.candidates.append(option)
         return
 
-    def _packFormatCompleter(self) -> None:
+    def _packFormatCompleter(self, rbs: RBS) -> None:
         formatMapping = self._aux_pack_getFormatMapping()
         dataTypeMapping = self._aux_pack_getDataTypeMapping()
         # 'n' and 'N' only available in native.
         nativeOnlyList = list(filter(lambda x: dataTypeMapping[x] in ['n', 'N'], dataTypeMapping.keys()))
         
-        if self.completer.words[1] in nativeOnlyList:
+        if rbs.words[1] in nativeOnlyList:
             self.completer.candidates.append('native')
             # '@' also valid, but omit for quicker typing.
             # self.completer.candidates.append('@')
@@ -747,30 +740,30 @@ class Parser():
         # Return all available options
         options = formatMapping.keys()
         for option in options:
-            if option.startswith(self.completer.being_completed):
+            if option.startswith(rbs.being_completed):
                 self.completer.candidates.append(option)
         return
 
-    def _commandCompleter(self) -> None:
+    def _commandCompleter(self, rbs: RBS) -> None:
         self.completer.candidates.extend( [
                 s
                 for s in self.commandDictionary
-                if s and s.startswith(self.completer.being_completed)
+                if s and s.startswith(rbs.being_completed)
             ]
         )
         return
 
-    def _fileCompleter(self) -> None:
+    def _fileCompleter(self, rbs: RBS) -> None:
         # FIXME: fix completion for paths with spaces
 
         # Append candidates for files
         # Find which word we are current completing
         # This is the space separated word, being_completed would start at the last '/'
-        word = self.completer.words[self.completer.getWordIdx()]
 
         # Find which directory we are in
         directory = os.curdir + "/"
         filenameStart = ""
+        word = rbs.words[rbs.wordIdx]
         if word:
             # There is at least some text being completed.
             if word.find("/") >= 0:
@@ -792,44 +785,45 @@ class Parser():
                     self.completer.candidates.append(file)
         return
 
-    def _settingsCompleter(self) -> None:
+    def _settingsCompleter(self, rbs: RBS) -> None:
         for settingName in [x.name for x in self.getSettingKeys()]:
-            if settingName.startswith(self.completer.being_completed):
+            if settingName.startswith(rbs.being_completed):
                 self.completer.candidates.append(settingName)
         return
 
-    def _variableCompleter(self) -> None:
-        self.completer.getVariableCandidates(False)
+    def _variableCompleter(self, rbs: RBS) -> None:
+        self.completer.getVariableCandidates(False, rbs)
         return
 
-    def _historyCompleter(self) -> None:
+    def _historyCompleter(self, rbs: RBS) -> None:
         # Get candidates from the history
-        history = [self.completer.readline.get_history_item(i) for i in range(0, self.completer.readline.get_current_history_length())]
+        history = self.application.getHistoryList()
         for historyline in history:
             if historyline is None or historyline == "":
                 continue
             
             # Get the whole line.
-            if historyline.startswith(self.completer.origline):
+            if historyline.startswith(rbs.origline):
                 # Must only append to the part that is currently being completed
                 # otherwise the whole line may be added again.
-                self.completer.candidates.append(historyline[self.completer.begin:])
-            
+                self.completer.candidates.append(historyline[rbs.begin:])            
         return
 
-    def _proxyNameCompleter(self) -> None:
-        for proxyName in self.application.proxies:
-            if proxyName.startswith(self.completer.being_completed):
-                self.completer.candidates.append(proxyName)
+    def _proxyNameCompleter(self, rbs: RBS) -> None:
+        for proxy in self.application.getProxyList():
+            if proxy.name.startswith(rbs.being_completed):
+                self.completer.candidates.append(proxy.name)
+            if str(proxy.localPort).startswith(rbs.being_completed):
+                self.completer.candidates.append(str(proxy.localPort))
         return
 
-    def _parserNameCompleter(self) -> None:
+    def _parserNameCompleter(self, rbs: RBS) -> None:
         FILE_SIZE_LIMIT_FOR_CHECK = 50 * (2 ** 10) # 50 KiB
         # find all files in directory
         for fileName in os.listdir(os.curdir):
             isCandidate = False
             try:
-                if not fileName.startswith(self.completer.being_completed):
+                if not fileName.startswith(rbs.being_completed):
                     # Skip filenames that don't match.
                     continue
 
@@ -869,7 +863,7 @@ class Parser():
     ###############################################################################
     # No need to edit the functions below
 
-    def parse(self, data: bytes, proxy, origin: ESocketRole) -> None:
+    def parse(self, data: bytes, proxy, origin: ESocketRole) -> list[str]:
         raise RuntimeError('Core parser is not meant to parse packets. Use derived parser instead.')
 
     # This function take the command line string and calls the relevant python function with the correct arguments.

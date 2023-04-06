@@ -289,14 +289,12 @@ class Hexdump():
         minorSpacerStr = ' '
         minorSpacer = self.constructMinorSpacer(minorSpacerStr)
 
-        idx = 0
-        for b in byteArray:
+        for idx, b in enumerate(byteArray):
             byteRepr = f"{b:02X}"
             colorSetting = self.getColorSetting(b)
             if colorSetting is not None:
                 byteRepr = colorSetting.colorize(byteRepr, idx % 2 == 0, ERepresentation.HEX)
             ret += byteRepr
-            idx += 1
 
             # Add spacers, skip the last spacer if end of byte array
             if idx % self.bytesPerGroup == 0 and idx < self.bytesPerLine:
@@ -310,8 +308,7 @@ class Hexdump():
     def constructPrintableString(self, byteArray: bytes) -> str:
         ret = ""
         minorSpacer = self.constructMinorSpacer(' ')
-        idx = 0
-        for b in byteArray:
+        for idx, b in enumerate(byteArray):
             # store character representation into c
             c = ""
             if self.printHighAscii or b <= 127:
@@ -325,10 +322,9 @@ class Hexdump():
             if colorSetting is not None:
                 c = colorSetting.colorize(c, idx % 2 == 0, ERepresentation.PRINTABLE)
             ret += c
-            idx += 1
             
             # Add spacers, skip the last spacer if end of byte array
-            if idx % self.bytesPerGroup == 0 and idx < self.bytesPerLine:
+            if (idx-1) % self.bytesPerGroup == 0 and idx < self.bytesPerLine:
                 ret += minorSpacer
 
         # Add padding to line it all up

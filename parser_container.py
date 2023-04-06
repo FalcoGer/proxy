@@ -21,8 +21,7 @@ class ParserContainer():
             
             # Check if we need to reset the readline completer also
             # since the completer class, which holds the completer function, is stored in the Parser.
-            readline = self.application.getReadlineModule()
-            completerFunction = readline.get_completer()
+            completerFunction = self.application.getCompleterFunction()
             needToSetCompleter = completerFunction == self.instance.completer.complete
             
             # Actually reload the module and create new instance with restored settings.
@@ -31,7 +30,7 @@ class ParserContainer():
             
             # Set the completer if required
             if needToSetCompleter:
-                readline.set_completer(self.instance.completer.complete)
+                self.application.setCompleterFunction(self.instance.completer.complete)
 
         return self.instance
 

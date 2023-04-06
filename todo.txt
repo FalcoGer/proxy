@@ -1,4 +1,11 @@
 Do:
+- Test every command
+    - core and passthrough
+    - too few, too many, wrong type, bad value arguments
+    - correct types and values, check expected effect
+        include and exclude optional arguments
+        check completion for every command
+
 - variable expansion format $(varname) as well as $varname
     completer also must work with this, even $(var1)$(va [TAB] should complete.
 
@@ -7,63 +14,24 @@ Do:
 
 - docstrings for all functions, modules and classes
 
-- make all application attributes private
-    make all readline module changes through function calls to application instead of getting readline
-    make getter functions where appropriate
+- documentation
+    example of stringing proxies together with different parsers
 
-- add parser name to proxy listing (lsproxy)
+- Make a PwnieIsland: PwnAdventure 3 proxy :)
 
-- decouple proxy and sockethandler from application
-    put received packets into a queue to be devoured by a new thread
-    options:
-    1. have one queue consumer per proxy
-        - have one prompt printer thread - no, seriously :(
-        - queue consumer calls parser, parser returns it's output as list[str]
-        - the queue consumer then calls print on that output (maybe lock? is print thread safe?)
-        - prompt printer thread checks all queue consumers if they have printed any output since the last check
-        - if all say no, then print the prompt (again)
-        Pros:
-            - queue can not lag behind parsing
-        Cons:
-            - Very complex
-            - Silly prompt printer thread shouldn't make sense
-            - Need to deconflict printing of lines
-
-    2. have one queue consumer for all proxies
-        - hand the queue to append to to the proxy run function
-        - have one thread to just move down that queue and parse all messages in it
-        - parser returns strings, if any are to be printed, print them and set a variable
-        - if the variable turns false after it had been true the last time, print a new prompt
-        - the first print should be an empty line to get off the current prompt
-        Pros:
-            - Easier to implement
-            - Only one queue and one thread to consume them
-            - No silly prompt printer thread
-            - Packets are parsed in the order they arrived on all proxies
-        Cons:
-            - If a lot of traffic arrives on multiple proxies, the queue might build up
-    3. Define terminal regions to print to using curses
-        - https://docs.python.org/3/library/curses.html
-        - print parser output in a larger top region
-        - print console and command output in a smaller bottom region
-        - provide a pager or some form of scrolling support if the output doesn't fit
-        Pros:
-            - Looks cool
-            - No need to reprint prompt and no prompts producing a dirty parser output
-            - could have tabs for each proxy and more such nonsense
-        Cons:
-            - way over the top
-            - need to do research on how to do it, possibly hard to implement
-            - complexity because it needs support for scrolling on separate regions
-            - might conflict with readline and/or termcolor
-            - difficult to split the screen into sensible regions for all use cases - would require user configurability        
-            - might need paging for long command outputs like help, possibly hard to implement
 Fix:
 - Latest command not part of history
 - clearhistory <id> not working
 - pack/unpack c_string and pascal_string not working right
-- no prompt after parser output
 - file completion not working with filenames with spaces
+- strange behavior when cursor not at end of line when packets are handled
+    - moving cursor causes issues
+    - getting output puts that output in the middle of the input line
+- no prompt after connection/disconnect/other messages.
 
 Ideas:
 - Allow "proxies" with connection to remote or listening sockets only to have the proxy act as the server/client, ie. a more fancy netcat
+    would allow simulating clients/servers with custom parsers that react to messages
+    would allow sending more complex data than with netcat, and easily send files without reconnecting
+
+- Allow MitM SSL?

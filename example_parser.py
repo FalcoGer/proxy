@@ -27,6 +27,7 @@ from hexdump import Hexdump
 
 # This is the base class for the custom parser class
 import base_parser
+from readline_buffer_status import ReadlineBufferStatus as RBS
 
 # import stuff for API calls
 from eSocketRole import ESocketRole
@@ -81,8 +82,9 @@ class Parser(base_parser.Parser):
     # Packet parsing stuff goes here.
 
     # Define what should happen when a packet arrives here
-    def parse(self, data: bytes, proxy, origin: ESocketRole) -> None:
-        super().parse(data, proxy, origin)
+    # Do not print here, instead append any console output you want to the output array, one line per entry.
+    def parse(self, data: bytes, proxy, origin: ESocketRole) -> list[str]:
+        output = super().parse(data, proxy, origin)
         
         # Do interesting stuff with the data here.
         #if data == b'ABCD\n' and origin == ESocketRole.client:
@@ -90,13 +92,15 @@ class Parser(base_parser.Parser):
 
         # A construct like this may be used to drop packets. 
         #if data.find(b'\xFF\xFF\xFF\xFF') >= 0:
-        #    print("Dropped")
-        #    return
+        #    output.append("Dropped")
+        #    return output
 
-        # By default, append the data as is to the queue to send it to the client/server.
-        target = ESocketRole.server if origin == ESocketRole.client else ESocketRole.client
-        proxy.sendData(target, data)
-        return
+        # By default, send the data to the client/server.
+        if origin == ESocketRole.client:
+            proxy.sendToServer(data)
+        else:
+            proxy.sendToClient(data)
+        return output
 
     ###############################################################################
     # CLI stuff goes here.
@@ -113,8 +117,8 @@ class Parser(base_parser.Parser):
     # The function is called when the command is executed, the string is the help text for that command.
     # The last completer in the completer array will be used for all words if the word index is higher than the index in the completer array.
     # If you don't want to provide more completions, use None at the end.
-    def buildCommandDict(self) -> dict:
-        ret = super().buildCommandDict()
+    def _buildCommandDict(self) -> dict:
+        ret = super()._buildCommandDict()
         
         # Add your custom commands here
         ret['example']      = (self._cmd_example, 'Sends the string in the example setting count times to the client.\nUsage: {0} [upper | lower | as_is] <count>\nExample {0} as_is 10.', [self._exampleCompleter, self._historyCompleter, None])
@@ -161,14 +165,14 @@ class Parser(base_parser.Parser):
 
     ###############################################################################
     # Completers go here.
-    # See completer.py for which values are available in the completer object.
+    # see readline_buffer_status.py for which values are available
     # Append any options you want to be in the auto completion list to completer.candidates
     # See core_parser.py for examples
 
-    def _exampleCompleter(self) -> None:
+    def _exampleCompleter(self, rbs: RBS) -> None:
         options = ["upper", "lower", "as_is"]
         for option in options:
-            if option.startswith(self.completer.being_completed):
+            if option.startswith(rbs.being_completed):
                 self.completer.candidates.append(option)
         return
 

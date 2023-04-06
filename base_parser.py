@@ -15,6 +15,7 @@ except ImportError:
 
 # This is the base class for the base parser
 import core_parser
+from readline_buffer_status import ReadlineBufferStatus as RBS
 
 from eSocketRole import ESocketRole
 from hexdump import Hexdump
@@ -79,7 +80,8 @@ class Parser(core_parser.Parser):
     # Packet parsing stuff goes here.
 
     # Define what should happen when a packet arrives here
-    def parse(self, data: bytes, proxy, origin: ESocketRole) -> None:
+    def parse(self, data: bytes, proxy, origin: ESocketRole) -> list[str]:
+        output = []
         pktNr = self.getSetting(EBaseSettingKey.PACKET_NUMBER)
         if self.getSetting(EBaseSettingKey.PACKETNOTIFICATION_ENABLED):
             # Print out the data in a nice format.
@@ -105,15 +107,15 @@ class Parser(core_parser.Parser):
                 dataLenStr = termcolor.colored(dataLenStr, 'green', None, ['bold'])
 
             # TimeStamp Proxy PktNr Direction DataLength
-            print(f"{tsStr} - {proxyStr} {pktNrStr} {directionStr} - {dataLenStr}")
+            output.append(f"{tsStr} - {proxyStr} {pktNrStr} {directionStr} - {dataLenStr}")
         if self.getSetting(EBaseSettingKey.HEXDUMP_ENABLED):
             hexdumpObj = self.getSetting(EBaseSettingKey.HEXDUMP)
             hexdumpLines = "\n".join(hexdumpObj.hexdump(data))
-            print(f"{hexdumpLines}")
+            output.append(f"{hexdumpLines}")
         
         pktNr += 1
         self.setSetting(EBaseSettingKey.PACKET_NUMBER, pktNr)
-        return
+        return output
 
     ###############################################################################
     # CLI stuff goes here.
@@ -130,8 +132,8 @@ class Parser(core_parser.Parser):
     # The function is called when the command is executed, the string is the help text for that command.
     # The last completer in the completer array will be used for all words if the word index is higher than the index in the completer array.
     # If you don't want to provide more completions, use None at the end.
-    def buildCommandDict(self) -> dict:
-        ret = super().buildCommandDict()
+    def _buildCommandDict(self) -> dict:
+        ret = super()._buildCommandDict()
 
         sendHexNote = "Usage: {0} <HexData> \nExample: {0} 41424344\nNote: Spaces in hex data are allowed and ignored."
         sendStringNote = "Usage: {0} <String>\nExample: {0} hello\\!\\n\nNote: Leading spaces in the string are sent\nexcept for the space between the command and\nthe first character of the string.\nEscape sequences are available."
@@ -202,7 +204,7 @@ class Parser(core_parser.Parser):
         userInput = ' '.join(args[1:])
 
         pkt = str.encode(userInput, 'utf-8')
-        pkt = self.escape(pkt)
+        pkt = self._escape(pkt)
         if proxy.connected:
             proxy.sendData(target, pkt)
             return 0
@@ -249,14 +251,14 @@ class Parser(core_parser.Parser):
 
         if len(args) > 3:
             try:
-                bytesPerGroup = self.strToInt(args[3])
+                bytesPerGroup = self._strToInt(args[3])
             except ValueError as e:
                 print(self.getHelpText(args[0]))
                 return f"Syntax error: {e}"
         
         if len(args) > 2:
             try:
-                bytesPerLine = self.strToInt(args[2])
+                bytesPerLine = self._strToInt(args[2])
                 if bytesPerLine < 1:
                     raise ValueError("Can't have less than 1 byte per line.")
             except ValueError as e:
@@ -288,102 +290,9 @@ class Parser(core_parser.Parser):
     ###############################################################################
     # Completers go here.
 
-    def _yesNoCompleter(self) -> None:
+    def _yesNoCompleter(self, rbs: RBS) -> None:
         options = ["yes", "no"]
         for option in options:
-            if option.startswith(self.completer.being_completed):
+            if option.startswith(rbs.being_completed):
                 self.completer.candidates.append(option)
         return
-
-    ###############################################################################
-    # No need to edit the functions below
-
-    # This function take the command line string and calls the relevant python function with the correct arguments.
-    def handleUserInput(self, userInput: str, proxy) -> object:
-        args = userInput.split(' ')
-
-        if len(userInput.strip()) == 0:
-            # Ignore empty commands
-            return 0
-        
-        if args[0] not in self.commandDictionary:
-            return f"Undefined command: \"{args[0]}\""
-
-        function, _, _ = self.commandDictionary[args[0]]
-        return function(args, proxy)
-
-    def getHelpText(self, cmdString: str) -> str:
-        _, helpText, _ = self.commandDictionary[cmdString]
-        try:
-            return helpText.format(cmdString)
-        except ValueError as e:
-            print(f"Unable to format helptext \"{helpText}\": {e}")
-            return helpText
-
-    # replaces escape sequences with the proper values
-    def escape(self, data: bytes) -> bytes:
-        idx = 0
-        newData = b''
-        while idx < len(data):
-            b = self.intToByte(data[idx])
-            if b == b'\\':
-                idx += 1 # Add one to the index so we don't read the escape sequence byte as a normal byte.
-                nextByte = self.intToByte(data[idx]) # May throw IndexError, pass it up to the user.
-                if nextByte == b'\\':
-                    newData += b'\\'
-                elif nextByte == b'n':
-                    newData += b'\n'
-                elif nextByte == b'r':
-                    newData += b'\r'
-                elif nextByte == b't':
-                    newData += b'\t'
-                elif nextByte == b'b':
-                    newData += b'\b'
-                elif nextByte == b'f':
-                    newData += b'\f'
-                elif nextByte == b'v':
-                    newData += b'\v'
-                elif nextByte == b'0':
-                    newData += b'\0'
-                elif nextByte == b'x':
-                    newData += bytes.fromhex(data[idx+1:idx+3].decode())
-                    idx += 2 # skip 2 more bytes.
-                elif ord(nextByte) in range(ord(b'0'), ord(b'7') + 1):
-                    octalBytes = data[idx:idx+3]
-                    num = int(octalBytes, 7)
-                    newData += self.intToByte(num)
-                    idx += 2 # skip 2 more bytes
-                    
-                elif nextByte == b'u':
-                    raise Exception("\\uxxxx is not supported")
-                elif nextByte == b'U':
-                    raise Exception("\\Uxxxxxxxx is not supported")
-                elif nextByte == b'N':
-                    raise Exception("\\N{Name} is not supported")
-                else:
-                    raise ValueError(f"Invalid escape sequence at index {idx} in {data}: \\{repr(nextByte)[2:-1]}")
-            else:
-                # No escape sequence. Just add the byte as is
-                newData += b
-            idx += 1
-        return newData
-
-    def intToByte(self, i: int) -> bytes:
-        return struct.pack('=b', i if i < 128 else i - 256)
-
-    def strToInt(self, dataStr: str) -> int:
-        if dataStr.startswith('0x'):
-            return int(dataStr[2:], 16)
-        if dataStr.startswith('x'):
-            return int(dataStr[1:], 16)
-        if dataStr.startswith('0o'):
-            return int(dataStr[2:], 8)
-        if (dataStr.startswith('0') and len(dataStr) > 1) or dataStr.startswith('o'):
-            return int(dataStr[1:], 8)
-        if dataStr.startswith('0b'):
-            return int(dataStr[2:], 2)
-        if dataStr.startswith('b'):
-            return int(dataStr[1:], 2)
-
-        return int(dataStr, 10)
-

@@ -12,13 +12,15 @@ class Parser(base_parser.Parser):
     def __str__(self) -> str:
         return "PASS"
 
-    def parse(self, data: bytes, proxy, origin: ESocketRole) -> None:
-        super().parse(data, proxy, origin)
+    def parse(self, data: bytes, proxy, origin: ESocketRole) -> list[str]:
+        output = super().parse(data, proxy, origin)
         
         # Pass data through to the target.
-        target = ESocketRole.server if origin == ESocketRole.client else ESocketRole.client
-        proxy.sendData(target, data)
-        return
+        if origin == ESocketRole.client:
+            proxy.sendToServer(data)
+        else:
+            proxy.sendToClient(data)
+        return output
 
     def __init__(self, application, settings):
         super().__init__(application, settings)

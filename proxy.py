@@ -17,13 +17,13 @@ from eSocketRole import ESocketRole
 # This is where users may do live edits and alter the behavior of the proxy.
 
 class Proxy(Thread):
-    def __init__(self, application, bindAddr: str, remoteAddr: str, localPort: int, remotePort: int, name: str):
+    def __init__(self, bindAddr: str, remoteAddr: str, localPort: int, remotePort: int, name: str, packetHandler):
         super().__init__()
         
         self.BIND_SOCKET_TIMEOUT = 3.0 # in seconds
 
-        self.application = application
         self.name = name
+        self.packetHandler = packetHandler
 
         self.connected = False
         self.isShutdown = False
@@ -226,9 +226,8 @@ class SocketHandler(Thread):
 
     def stop(self) -> None:
         # Cleanup of the socket is in the thread itself, in the run() function, to avoid the need for locks.
-        self.lock.acquire()
-        self.running = False
-        self.lock.release()
+        with self.lock:
+            self.running = False
         return
 
     def checkAlive(self) -> (bool, bool, bool):
@@ -284,10 +283,7 @@ class SocketHandler(Thread):
             # If we got data, parse it.
             if data:
                 try:
-                    # Parse the data. The parser may enqueue any data it wants to send on to the server.
-                    # The parser adds any packages it actually wants to forward for the server to the queue.
-                    parser = self.proxy.application.getParserByProxy(self.proxy)
-                    parser.parse(data, self.proxy, self.role)
+                    self.proxy.packetHandler(data, self.proxy, self.role)
                 # pylint: disable=broad-except
                 except Exception as e:
                     print(f'[EXCEPT] - parse data from {self}: {e}')

@@ -1,9 +1,11 @@
 #!/bin/python3
 
 import os
+import sys
 import argparse
 import traceback
 import time
+from readline_buffer_status import ReadlineBufferStatus
 
 # This allows auto completion and history browsing
 try:
@@ -13,39 +15,37 @@ except ImportError:
 
 from proxy import Proxy
 from parser_container import ParserContainer
+from eSocketRole import ESocketRole
 
 class Application():
     def __init__(self):
-        self.HISTORY_FILE = "history.log"
         self.DEFAULT_PARSER_MODULE = "passthrough_parser"
         self.START_TIME = time.time()
-        
-        self.variables: dict[(str, str)] = {}
-        self.running = True
-        self.selectedProxyName: str = None
-        self.proxies: dict[(str, Proxy)] = {}
-        self.parsers: dict[(Proxy, ParserContainer)] = {None: ParserContainer('core_parser', self)}
+
+        self._HISTORY_FILE = "history.log" 
+        self._variables: dict[(str, str)] = {}
+        self._running = True
+        self._selectedProxyName: str = None
+        self._proxies: dict[(str, Proxy)] = {}
+        self._parsers: dict[(Proxy, ParserContainer)] = {None: ParserContainer('core_parser', self)}
         
         # parse command line arguments.
         arg_parser = argparse.ArgumentParser(description='Create multiple proxy connections. Provide multiple proxy parameters to create multiple proxies.')
         arg_parser.add_argument('-b', '--bind', metavar=('binding_address'), required=False, help='Bind IP-address for the listening socket. Default \'0.0.0.0\'', default='0.0.0.0')
         arg_parser.add_argument('-p', '--proxy', nargs=3, metavar=('lp', 'rp', 'host'), action='append', required=False, help='Local port to listen on as well as the remote port and host ip address or hostname for the proxy to connect to.')
 
-        self.args = arg_parser.parse_args()
+        self._args = arg_parser.parse_args()
 
         # Fix proxy argument Typing since nargs > 1 doesn't support multiple types such as (int, int, str)
         # REF: https://github.com/python/cpython/issues/82398
-        if self.args.proxy is not None:
+        if self._args.proxy is not None:
             try:
-                idx = 0
-                for proxyArgs in self.args.proxy:
+                for idx, proxyArgs in enumerate(self._args.proxy):
                     localPort = int(proxyArgs[0])
                     remotePort = int(proxyArgs[1])
                     remoteHost = proxyArgs[2]
 
-                    self.args.proxy[idx] = [localPort, remotePort, remoteHost]
-                    idx += 1
-
+                    self._args.proxy[idx] = [localPort, remotePort, remoteHost]
             except TypeError as e:
                 print(f"Error: {e}")
                 arg_parser.print_usage()
@@ -59,20 +59,19 @@ class Application():
         # allow for completion of !<histIdx> and $<varname>
         # readline.set_completer_delims(readline.get_completer_delims().replace("!", "").replace("$", ""))
         readline.set_completer_delims(' /')
-        
+        self._rbs: ReadlineBufferStatus = ReadlineBufferStatus(readline)
         # Try to load history file or create it if it doesn't exist.
         try:
-            if os.path.exists(self.HISTORY_FILE):
-                readline.read_history_file(self.HISTORY_FILE)
+            if os.path.exists(self._HISTORY_FILE):
+                readline.read_history_file(self._HISTORY_FILE)
             else:
-                readline.write_history_file(self.HISTORY_FILE)
+                readline.write_history_file(self._HISTORY_FILE)
         except (PermissionError, FileNotFoundError, IsADirectoryError) as e:
-            print(f"Can not read or create {self.HISTORY_FILE}: {e}")
+            print(f"Can not read or create {self._HISTORY_FILE}: {e}")
 
         # Create a proxies and parsers based on arguments.
-        if self.args.proxy is not None:
-            idx = 0
-            for proxyArgs in self.args.proxy:
+        if self._args.proxy is not None:
+            for idx, proxyArgs in enumerate(self._args.proxy):
                 localPort = proxyArgs[0]
                 remotePort = proxyArgs[1]
                 remoteHost = proxyArgs[2]
@@ -82,14 +81,18 @@ class Application():
                 # Select the first proxy
                 if idx == 0:
                     self.selectProxyByName(name)
-                idx += 1
         else:
             # To initialize the completer for the core_parser
             self.selectProxy(None)
+        return
+
+    def stop(self) -> None:
+        self._running = False
+        return
 
     def main(self) -> None:
         # Accept user input and parse it.
-        while self.running:
+        while self._running:
             try:
                 try:
                     print() # Empty line
@@ -137,13 +140,13 @@ class Application():
                 print(traceback.format_exc())
         
         # Save the history file.
-        for proxy in self.proxies.values():
+        for proxy in self._proxies.values():
             proxy.shutdown()
 
-        for proxy in self.proxies.values():
+        for proxy in self._proxies.values():
             proxy.join()
             
-        readline.write_history_file(self.HISTORY_FILE)
+        readline.write_history_file(self._HISTORY_FILE)
         return
 
     def getPromptString(self) -> str:
@@ -156,11 +159,11 @@ class Application():
         if command != lastHistoryItem and len(command) > 0:
             # Reloading the history file doesn't seem to fix it.
             readline.add_history(command)
-            readline.append_history_file(1, self.HISTORY_FILE)
+            readline.append_history_file(1, self._HISTORY_FILE)
         return
 
     def getSelectedProxy(self) -> Proxy:
-        return self.getProxyByName(self.selectedProxyName)
+        return self.getProxyByName(self._selectedProxyName)
 
     def getSelectedParser(self):
         proxy = self.getSelectedProxy()
@@ -170,20 +173,26 @@ class Application():
         if name is None:
             return None
 
-        return self.proxies[name]
+        return self._proxies[name]
 
     def getProxyByNumber(self, num: int) -> Proxy:
         # By ID
-        if num < len(self.proxies):
-            return list(self.proxies.values())[num]
+        if num < len(self._proxies):
+            return list(self._proxies.values())[num]
         # ID not found, maybe port number?
-        for proxy in self.proxies.values():
+        for proxy in self._proxies.values():
             if proxy.localPort == num:
                 return proxy
         raise IndexError(f'No proxy found with either local port or index {num}.')
 
+    def getProxyList(self) -> list[Proxy]:
+        return list(self._proxies.values())
+
+    def getProxyNameList(self) -> list[str]:
+        return list(self._proxies)
+
     def getParserByProxy(self, proxy: Proxy):
-        return self.parsers[proxy].getInstance()
+        return self._parsers[proxy].getInstance()
 
     def getParserByProxyName(self, name: str):
         proxy = self.getProxyByName(name)
@@ -191,10 +200,10 @@ class Application():
 
     def setParserForProxy(self, proxy, parserName) -> None:
         newParser = ParserContainer(parserName, self)
-        self.parsers[proxy] = newParser
+        self._parsers[proxy] = newParser
 
         # Need to reload the completer if the current proxy got it's parser changed
-        if proxy.name == self.selectedProxyName:
+        if proxy.name == self._selectedProxyName:
             readline.set_completer(self.getSelectedParser().completer.complete)
         return
 
@@ -205,9 +214,9 @@ class Application():
 
     def selectProxy(self, proxy: Proxy) -> None:
         if proxy is None:
-            self.selectedProxyName = None
+            self._selectedProxyName = None
         else:
-            self.selectedProxyName = proxy.name
+            self._selectedProxyName = proxy.name
         
         # reload the correct completer
         readline.set_completer(self.getSelectedParser().completer.complete)
@@ -229,16 +238,16 @@ class Application():
         if ord(proxyName[0]) in range(ord('0'), ord('9') + 1):
             raise ValueError('proxyName must not start with a digit.')
         
-        if proxyName in self.proxies:
+        if proxyName in self._proxies:
             raise KeyError(f'There already is a proxy with the name {proxyName}.')
 
         # Create proxy and default parser
-        proxy = Proxy(self, self.args.bind, remoteHost, localPort, remotePort, proxyName)
+        proxy = Proxy(self._args.bind, remoteHost, localPort, remotePort, proxyName, self.packetHandler)
         parser = ParserContainer(self.DEFAULT_PARSER_MODULE, self)
         
         # Add them to their dictionaries
-        self.proxies[proxy.name] = proxy
-        self.parsers[proxy] = parser
+        self._proxies[proxy.name] = proxy
+        self._parsers[proxy] = parser
         
         # Start the proxy thread
         proxy.start()
@@ -249,14 +258,14 @@ class Application():
         if self.getSelectedProxy() == proxy:
             self.selectProxy(None)
 
-        proxy = self.proxies.pop(proxy.name)
+        proxy = self._proxies.pop(proxy.name)
         # Kill it
         proxy.shutdown()
         # Wait for the thread to finish
         proxy.join()
 
         # Delete Parser
-        self.parsers.pop(proxy)
+        self._parsers.pop(proxy)
         return
 
     def killProxyByName(self, proxyName: str) -> None:
@@ -271,13 +280,13 @@ class Application():
         if ord(newName[0]) in range(ord('0'), ord('9') + 1):
             raise ValueError('newName must not start with a digit.')
         
-        if newName in self.proxies:
+        if newName in self._proxies:
             raise KeyError(f'Proxy with name {newName} already exists.')
         
-        self.proxies[newName] = self.proxies.pop(proxy.name)
+        self._proxies[newName] = self._proxies.pop(proxy.name)
         # Make sure we update the selected proxy if we rename the currently selected one.
-        if self.selectedProxyName == proxy.name:
-            self.selectedProxyName = newName
+        if self._selectedProxyName == proxy.name:
+            self._selectedProxyName = newName
         proxy.name = newName
         return
 
@@ -285,28 +294,31 @@ class Application():
         proxy = self.getProxyByName(oldName)
         self.renameProxy(proxy, newName)
         return
+    
+    def getVaribleNames(self) -> list[str]:
+        return list(self._variables)
 
     def getVariable(self, variableName: str) -> str:
         if not self.checkVariableName(variableName):
             raise ValueError(f"Bad variable name: \"{variableName}\"")
         
-        return self.variables.get(variableName, None)
+        return self._variables.get(variableName, None)
 
     def setVariable(self, variableName: str, value: str) -> None:
         if not self.checkVariableName(variableName):
             raise ValueError(f"Bad variable name: \"{variableName}\"")
 
-        self.variables[variableName] = value
+        self._variables[variableName] = value
         return
 
     def unsetVariable(self, variableName: str) -> bool:
         if not self.checkVariableName(variableName):
             raise ValueError(f"Bad variable name: \"{variableName}\"")
         
-        if variableName not in self.variables:
+        if variableName not in self._variables:
             return False
 
-        self.variables.pop(variableName)
+        self._variables.pop(variableName)
         return True
 
     def checkVariableName(self, variableName: str) -> bool:
@@ -323,15 +335,11 @@ class Application():
                 return False
         return True
     
-    def getReadlineModule(self):
-        return readline
-
     def expandHistoryCommand(self, cmd: str) -> str:
         words = cmd.split(" ")
-        idx = 0
 
         # Expand history substitution
-        for word in words:
+        for idx, word in enumerate(words):
             if word.startswith("!"):
                 histIdx = int(word[1:]) # Let it throw ValueError to notify user.
                 if not 0 <= histIdx < readline.get_current_history_length():
@@ -342,7 +350,6 @@ class Application():
                     raise ValueError(f"History index {histIdx} points to invalid history entry.")
                 
                 words[idx] = historyItem
-            idx += 1
 
         # Save it to a different variable to save this modified command to the history.
         # This is done to preserve the variable expansion later in the history.
@@ -352,22 +359,69 @@ class Application():
     def expandVariableCommand(self, cmd: str) -> str:
         # TODO: allow for $(varname) format
         words = cmd.split(' ')
-        idx = 0
         word = None
         try:
-            for word in words:
+            for idx, word in enumerate(words):
                 if word.startswith("$"):
                     varname = word[1:]
-                    words[idx] = self.variables[varname] # Let it throw KeyError to notify user.
-
-                idx += 1
+                    words[idx] = self._variables[varname] # Let it throw KeyError to notify user.
         except KeyError as e:
             raise KeyError(f'Variable {word} does not exist: {e}') from e
         
         # reassemble cmd
         variableExpandedCmd = ' '.join(words)
         return variableExpandedCmd
+    
+    def getReadlineBufferStatus(self) -> ReadlineBufferStatus:
+        self._rbs.update()
+        return self._rbs
 
+    def getHistoryList(self) -> list[str]:
+        return list(self.getHistoryItem(x) for x in range(0, readline.get_history_length()))
+
+    def getHistoryItem(self, idx: int) -> str:
+        if not 0 <= idx < readline.get_history_length():
+            raise IndexError(f'{idx} is not a valid history index.')
+        return readline.get_history_item(idx)
+
+    def deleteHistoryItem(self, idx: int) -> None:
+        if not 0 <= idx < readline.get_history_length():
+            raise IndexError(f'{idx} is not a valid history index.')
+        # FIXME: Doesn't work
+        readline.remove_history_item(idx)
+
+        readline.write_history_file(self._HISTORY_FILE)
+        return
+
+    def clearHistory(self) -> None:
+        readline.clear_history()
+        readline.write_history_file(self._HISTORY_FILE)
+        return
+
+    def getCompleterFunction(self):
+        return readline.get_completer()
+
+    def setCompleterFunction(self, func) -> None:
+        readline.set_completer(func)
+        return
+
+    def packetHandler(self, data: bytes, proxy: Proxy, origin: ESocketRole) -> None:
+        parser = self.getParserByProxy(proxy)
+        output = parser.parse(data, proxy, origin)
+        if len(output) == 0:
+            return
+
+        # Get off the current line (with a prompt on it)
+        print()
+        for line in output:
+            print(line)
+        # Make some space between the output and the new prompt
+        print()
+
+        # Print a new prompt with the line we currently have in the buffer
+        self._rbs.update()
+        print(self.getPromptString() + self._rbs.origline, end='')
+        sys.stdout.flush()
 
 # Run
 if __name__ == '__main__':
