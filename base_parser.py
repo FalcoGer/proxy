@@ -6,6 +6,12 @@
 import struct
 import os
 from enum import Enum, auto
+import time
+try:
+    import termcolor
+    _COLOR_AVAILABLE = True
+except ImportError:
+    _COLOR_AVAILABLE = False
 
 # This is the base class for the base parser
 import core_parser
@@ -20,6 +26,7 @@ class EBaseSettingKey(Enum):
     HEXDUMP_ENABLED             = auto()
     HEXDUMP                     = auto()
     PACKETNOTIFICATION_ENABLED  = auto()
+    PACKET_NUMBER               = auto()
 
     def __eq__(self, other) -> bool:
         if other is int:
@@ -49,7 +56,7 @@ class Parser(core_parser.Parser):
 
     def __str__(self) -> str:
         # The base parser doesn't forward packets, so using it would drop them all.
-        return "DROP"
+        return "BASE/DROP"
 
     # Return a list of setting keys. Make sure to also include the base classes keys.
     def getSettingKeys(self) -> list[Enum]:
@@ -59,14 +66,13 @@ class Parser(core_parser.Parser):
 
     # Define the defaults for each setting here.
     def getDefaultSettings(self) -> dict[(Enum, object)]:
-        baseDefaultSettings = {
+        defaultSettings = {
                 EBaseSettingKey.HEXDUMP_ENABLED: True,
                 EBaseSettingKey.HEXDUMP: Hexdump(),
                 EBaseSettingKey.PACKETNOTIFICATION_ENABLED: True,
             }
         # Return the base class defaults as well
-        defaultSettings = super().getDefaultSettings()
-        return defaultSettings | baseDefaultSettings
+        return super().getDefaultSettings() | defaultSettings
 
     ###############################################################################
     # Packet parsing stuff goes here.
@@ -75,14 +81,39 @@ class Parser(core_parser.Parser):
     def parse(self, data: bytes, proxy, origin: ESocketRole) -> None:
         if self.getSetting(EBaseSettingKey.PACKETNOTIFICATION_ENABLED):
             # Print out the data in a nice format.
-            directionStr = "C -> S" if origin == ESocketRole.client else "C <- S"
+            ts = time.time() - self.application.START_TIME
+            tsStr = f'{ts:>14.8f}'
+            
             maxProxyNameLen = max(len(proxy.name) for proxy in self.application.proxies.values())
-            print(f"{proxy.name.ljust(maxProxyNameLen)} [{directionStr}] - ({len(data)} Byte{'s' if len(data) > 1 else ''})")
+            proxyStr = proxy.name.ljust(maxProxyNameLen)
+            
+            pktNr = self.getSetting(core_parser.ECoreSettingKey.PACKET_NUMBER)
+            pktNrStr = f'[PKT# {pktNr}]'
 
+            directionStr = "[C -> S]" if origin == ESocketRole.client else "[C <- S]"
+
+            dataLenStr = f'{len(data)} Byte{"s" if len(data) > 1 else ""}'
+            
+            if _COLOR_AVAILABLE:
+                tsStr = termcolor.colored(tsStr, 'cyan')
+                proxyStr = termcolor.colored(proxyStr, 'green', None, ['bold'])
+                pktNrStr = termcolor.colored(pktNrStr, 'yellow', None)
+                if origin == ESocketRole.client:
+                    directionStr = termcolor.colored(directionStr, 'white', 'on_blue')
+                else:
+                    directionStr = termcolor.colored(directionStr, 'white', 'on_magenta')
+                dataLenStr = termcolor.colored(dataLenStr, 'green', None, ['bold'])
+
+            # TimeStamp Proxy PktNr Direction DataLength
+            print(f"{tsStr} - {proxyStr} {pktNrStr} {directionStr} - {dataLenStr}")
         if self.getSetting(EBaseSettingKey.HEXDUMP_ENABLED):
             hexdumpObj = self.getSetting(EBaseSettingKey.HEXDUMP)
             hexdumpLines = "\n".join(hexdumpObj.hexdump(data))
             print(f"{hexdumpLines}")
+        
+        pktNr = self.getSetting(EBaseSettingKey.PACKET_NUMBER)
+        pktNr += 1
+        self.setSetting(EBaseSettingKey.PACKET_NUMBER, pktNr)
         return
 
     ###############################################################################

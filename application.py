@@ -3,6 +3,7 @@
 import os
 import argparse
 import traceback
+import time
 
 # This allows auto completion and history browsing
 try:
@@ -17,6 +18,7 @@ class Application():
     def __init__(self):
         self.HISTORY_FILE = "history.log"
         self.DEFAULT_PARSER_MODULE = "passthrough_parser"
+        self.START_TIME = time.time()
         
         self.variables: dict[(str, str)] = {}
         self.running = True
