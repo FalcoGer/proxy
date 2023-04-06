@@ -324,7 +324,7 @@ class Hexdump():
             ret += c
             
             # Add spacers, skip the last spacer if end of byte array
-            if (idx-1) % self.bytesPerGroup == 0 and idx < self.bytesPerLine:
+            if (idx + 1) % self.bytesPerGroup == 0 and (idx + 1) < self.bytesPerLine:
                 ret += minorSpacer
 
         # Add padding to line it all up
