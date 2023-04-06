@@ -292,7 +292,7 @@ class SocketHandler(Thread):
                 except Exception as e:
                     print(f'[EXCEPT] - parse data from {self}: {e}')
                     print(traceback.format_exc())
-                    self.stop()
+                    self.proxy.disconnect()
             
             # Send the queue
             queueEmpty = self.dataQueue.empty()

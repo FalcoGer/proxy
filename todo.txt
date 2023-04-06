@@ -64,5 +64,6 @@ Fix:
 - pack/unpack c_string and pascal_string not working right
 - no prompt after parser output
 - file completion not working with filenames with spaces
-- proxy doesn't set connected = false when exception occurs during parsing, but the socket gets disconnected
 
+Ideas:
+- Allow "proxies" with connection to remote or listening sockets only to have the proxy act as the server/client, ie. a more fancy netcat
