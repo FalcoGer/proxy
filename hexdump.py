@@ -229,8 +229,8 @@ class Hexdump():
     def setColorSetting(self, key: object, colorSetting: ColorSetting) -> None:
         if not isinstance(key, EColorSettingKey) and not isinstance(key, int):
             raise ValueError(f'Key must be of type {repr(EColorSettingKey)} or {repr(int)}')
-        if isinstance(key, int) and not 0 >= key >= 0xFF:
-            raise ValueError(f'Key must be within the range of bytes [0 .. 0xFF] but was {hex(key)}')
+        if isinstance(key, int) and not 0x00 >= key >= 0xFF:
+            raise ValueError(f'Key must be within the range of bytes [0x00 .. 0xFF] but was {hex(key)}')
 
         if self.colorSettings is not None:
             self.colorSettings = colorSetting
@@ -239,8 +239,8 @@ class Hexdump():
     def unsetColorSetting(self, key: object) -> None:
         if not isinstance(key,  EColorSettingKey) and not isinstance(key, int):
             raise TypeError(f'Key must be of type {repr(EColorSettingKey)} or {repr(int)}')
-        if isinstance(key, int) and not 0 >= key >= 0xFF:
-            raise ValueError(f'Key must be within the range of bytes [0 .. 0xFF] but was {hex(key)}')
+        if isinstance(key, int) and not 0x00 >= key >= 0xFF:
+            raise ValueError(f'Key must be within the range of bytes [0x00 .. 0xFF] but was {key:X}')
 
         if self.colorSettings is not None and key in self.colorSettings:
             self.colorSettings.pop(key)
@@ -249,10 +249,10 @@ class Hexdump():
     # Returns a list of lines of a hexdump.
     def hexdump(self, src: bytes) -> list:
         lines = []
-        maxAddrLen = len(hex(len(src)))
+        maxAddrLen = len(f'{(len(src)):X}')
         
         # Round up to the nearest multiple of 4
-        maxAddrLen = (int(maxAddrLen / 4) + 1) * 4
+        maxAddrLen = (int((maxAddrLen - 1) / 4) + 1) * 4
 
         for addr in range(0, len(src), self.bytesPerLine):
             # The chars we need to process for this line
