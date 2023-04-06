@@ -874,12 +874,19 @@ class Parser():
         return
 
     def _proxyNameCompleter(self, rbs: RBS) -> None:
+        # Find listening port numbers only if we started with a number.
+        if len(rbs.being_completed) > 0 and ord(rbs.being_completed[0]) in range(ord('0'), ord('9') + 1):
+            for proxy in self.application.getProxyList():
+                if str(proxy.localPort).startswith(rbs.being_completed):
+                    self.completer.candidates.append(str(proxy.localPort))
+            return
+        
+        # Find Names otherwise. (Names can't start with a number)
         for proxy in self.application.getProxyList():
             if proxy.name.startswith(rbs.being_completed):
                 self.completer.candidates.append(proxy.name)
-            if str(proxy.localPort).startswith(rbs.being_completed):
-                self.completer.candidates.append(str(proxy.localPort))
         return
+
 
     def _parserNameCompleter(self, rbs: RBS) -> None:
         FILE_SIZE_LIMIT_FOR_CHECK = 50 * (2 ** 10) # 50 KiB
