@@ -206,8 +206,14 @@ class Application():
         return self.getParserByProxy(proxy)
 
     def setParserForProxy(self, proxy, parserName) -> None:
-        newParser = ParserContainer(parserName, self)
-        self._parsers[proxy] = newParser
+        # Save old settings to put them into the new parser when applicable
+        oldParser = self.getParserByProxy(proxy)
+        settings = oldParser.settings
+
+        # Create new parser and set it
+        newParserContainer = ParserContainer(parserName, self)
+        newParserContainer.setSettings(settings)
+        self._parsers[proxy] = newParserContainer
 
         # Need to reload the completer if the current proxy got it's parser changed
         if proxy.name == self._selectedProxyName:

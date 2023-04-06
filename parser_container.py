@@ -14,6 +14,15 @@ class ParserContainer():
     def __str__(self) -> str:
         return self.dynamicLoader.moduleName
 
+    def setSettings(self, settings: dict) -> None:
+        completerFunction = self.application.getCompleterFunction()
+        needToSetCompleter = completerFunction == self.instance.completer.complete
+        self.instance = self.dynamicLoader.getModule().Parser(self.application, settings)
+
+        if needToSetCompleter:
+            self.application.setCompleterFunction(self.instance.completer.complete)
+
+
     def getInstance(self) -> Parser.Parser:
         if self.dynamicLoader.checkNeedsReload():
             # Save settings
