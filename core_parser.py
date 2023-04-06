@@ -110,7 +110,7 @@ class Parser():
         ret['loadparser']   = (self._cmd_loadparser, f'Load a custom parser for proxy.\nUsage: {{0}} [<Proxy>] <ParserName>\nExample: {{0}} PROXY_8080 example_parser\nIf Proxy is omitted, this changes the parser of the currently selected proxy.\n{proxySelectionNote}', [self._proxyNameCompleter, self._parserNameCompleter, None])
         ret['lsproxy']      = (self._cmd_lsproxy, 'Display all configured proxies and their status.\nUsage: {0}', None)
         ret['run']          = (self._cmd_run, 'Runs a script file.\nUsage: {0} <FilePath> [<LineNumber>]\nIf line number is given, the script will start execution on that line.\nLines starting with "#" will be ignored.', [self._fileCompleter, self._historyCompleter, None])
-        ret['clearhistory'] = (self._cmd_clearhistory, 'Clear the command history or delete one entry of it.\nUsage: {0} [<HistoryIndex>].\nNote: The history file will instantly be overwritten.', None)
+        ret['clearhistory'] = (self._cmd_clearhistory, 'Clear the command history or delete one entry of it.\nUsage: {0} [<HistoryIndex>].\nNote: The history file will written only on exit.', None)
         ret['lshistory']    = (self._cmd_lshistory, 'Show the command history or display one entry of it.\nUsage: {0} [<HistoryIndex>]', None)
         ret['lssetting']    = (self._cmd_lssetting, 'Show the current settings or display a specific setting.\nUsage: {0} [<SettingName>]', [self._settingsCompleter, None])
         ret['set']          = (self._cmd_set, 'Sets variable to a value\nUsage: {0} <VariableName> <Value>\nExample: {0} httpGet GET / HTTP/1.0\\n', [self._variableCompleter, self._historyCompleter])
