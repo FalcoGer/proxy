@@ -154,7 +154,7 @@ class Parser():
         termColumns = os.get_terminal_size().columns
         SPACES_BETWEEN_CMDS = 3
         maxLen += SPACES_BETWEEN_CMDS
-        maxCmdsPerLine = int(termColumns / maxLen)
+        maxCmdsPerLine = max([int(termColumns / maxLen), 1])
         print() # Make some space.
         for idx, cmdname in enumerate(self.commandDictionary):
             print(f'{cmdname.ljust(maxLen)}', end=('' if (idx + 1) % maxCmdsPerLine != 0 else '\n'))
