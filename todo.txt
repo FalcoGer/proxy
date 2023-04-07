@@ -35,6 +35,7 @@ Ideas:
 - Allow "proxies" with connection to remote or listening sockets only to have the proxy act as the server/client, ie. a more fancy netcat
     would allow simulating clients/servers with custom parsers that react to messages
     would allow sending more complex data than with netcat, and easily send files without reconnecting
+    - import sockethandler into server and client classes, same as proxy, except the setup is different, should be easy
 
 - Allow MitM SSL?
 
