@@ -10,14 +10,16 @@ import traceback
 import time
 
 # This allows auto completion and history browsing
-try:
-    import gnureadline as readline
-except ImportError:
+if sys.platform == 'linux':
+    # pylint: disable=import-error
     try:
-        import readline
+        import gnureadline as readline
     except ImportError:
-        from pyreadline3 import Readline
-        readline = Readline()
+        import readline
+elif sys.platform == 'win32':
+    # pylint: disable=import-error
+    from pyreadline3 import Readline
+    readline = Readline()
 
 from readline_buffer_status import ReadlineBufferStatus
 from proxy import Proxy
