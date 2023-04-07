@@ -478,9 +478,7 @@ class Application():
 # Run
 if __name__ == '__main__':
     if sys.platform == 'win32':
-        colorama.init()
+        colorama.just_fix_windows_console()
     application = Application()
     application.main()
-    if sys.platform == 'win32':
-        colorama.deinit()
 
