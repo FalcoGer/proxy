@@ -20,6 +20,10 @@ elif sys.platform == 'win32':
     # pylint: disable=import-error
     from pyreadline3 import Readline
     readline = Readline()
+    
+    # Enable ANSI sequence color output in windows.
+    import colorama
+    colorama.init()
 
 from readline_buffer_status import ReadlineBufferStatus
 from proxy import Proxy

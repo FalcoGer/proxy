@@ -5,6 +5,7 @@ gnureadline; sys_platform == 'linux'
 
 # color support
 termcolor
+colorama; sys_platform == 'win32'
 
 # renaming of processes and threads via syscalls
 # renaming in python alone doesn't update process table
