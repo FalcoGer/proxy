@@ -71,7 +71,8 @@ class Application():
         # Setup readline
         readline.parse_and_bind('tab: complete')
         readline.parse_and_bind('set editing-mode vi')
-        readline.set_auto_history(False)
+        if sys.platform != 'win32':
+            readline.set_auto_history(False)
         readline.set_history_length(512)
         # allow for completion of !<histIdx> and $<varname>
         # readline.set_completer_delims(readline.get_completer_delims().replace('!', '').replace('$', ''))
