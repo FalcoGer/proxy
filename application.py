@@ -23,7 +23,6 @@ elif sys.platform == 'win32':
     
     # Enable ANSI sequence color output in windows.
     import colorama
-    colorama.init()
 
 from readline_buffer_status import ReadlineBufferStatus
 from proxy import Proxy
@@ -478,6 +477,10 @@ class Application():
 
 # Run
 if __name__ == '__main__':
+    if sys.platform == 'win32':
+        colorama.init()
     application = Application()
     application.main()
+    if sys.platform == 'win32':
+        colorama.deinit()
 
