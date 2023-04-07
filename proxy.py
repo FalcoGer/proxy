@@ -24,11 +24,10 @@ if typing.TYPE_CHECKING:
 
 class Proxy(Thread):
     def __init__(self, bindAddr: str, remoteAddr: str, localPort: int, remotePort: int, name: str, packetHandler: PHType, outputHandler: OHType):
-        super().__init__()
+        super().__init__(name=name)
         
         self.BIND_SOCKET_TIMEOUT = 3.0 # in seconds
 
-        self.name = name
         self._packetHandler = packetHandler
         self._outputHandler = outputHandler
 
@@ -36,9 +35,9 @@ class Proxy(Thread):
         self._isShutdown = False
 
         self._bindAddr = bindAddr
-        self.remoteAddr = remoteAddr
+        self._remoteAddr = remoteAddr
         self._localPort = localPort
-        self.remotePort = remotePort
+        self._remotePort = remotePort
         
         # Sockets
         self._bindSocket = None
@@ -64,12 +63,12 @@ class Proxy(Thread):
         else:
             ch, cp = self.getClient()
             ret += f'E] {ch}:{cp} <---> :{self._localPort} <--->'
-        rh, rp = (self.remoteAddr, self.remotePort)
+        rh, rp = (self._remoteAddr, self._remotePort)
         ret += f' {rh}:{rp}'
         return ret
 
     def run(self) -> typing.NoReturn:
-        # after client disconnected await a new client connection
+        # after client disconnected await a new client connection until shutdown.
         while not self._isShutdown:
             output = []
             try:
@@ -83,7 +82,7 @@ class Proxy(Thread):
                 output.append(f'[{self}]: Client connected: {ch}:{cp}')
                 
                 # Connect to the remote host after a client has connected.
-                output.append(f'[{self}]: Connecting to {self.remoteAddr}:{self.remotePort}')
+                output.append(f'[{self}]: Connecting to {self._remoteAddr}:{self._remotePort}')
                 if not self._connect():
                     output.append(f'[{self}]: Could not connect to remote host.')
                     self._client.start()
@@ -187,12 +186,12 @@ class Proxy(Thread):
 
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.connect((self.remoteAddr, self.remotePort))
+            sock.connect((self._remoteAddr, self._remotePort))
             self._server = SocketHandler(sock, ESocketRole.server, self, self._outputHandler, self._packetHandler)
             return True
         # pylint: disable=broad-except
         except Exception as e:
-            self._outputHandler(f'[{self}]: Unable to connect to server {self.remoteAddr}:{self.remotePort}: {e}')
+            self._outputHandler(f'[{self}]: Unable to connect to server {self._remoteAddr}:{self._remotePort}: {e}')
         return False
     
     def getIsConnected(self) -> bool:
@@ -279,9 +278,12 @@ class SocketHandler(Thread):
     def run(self) -> typing.NoReturn:
         if self._sock is None:
             raise RuntimeError('Socket has expired. Can not start again after shutdown.')
+        
         with self._lock:
             self._running = True
         localRunning = True
+        
+        # run until stop() is called.
         while localRunning:
             output = []
             try: # Try-Finally block for output.
