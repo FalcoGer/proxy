@@ -1,11 +1,13 @@
 #!/bin/python3
 
+from __future__ import annotations
+import typing
+
 import os
 import sys
 import argparse
 import traceback
 import time
-from readline_buffer_status import ReadlineBufferStatus
 
 # This allows auto completion and history browsing
 try:
@@ -13,16 +15,20 @@ try:
 except ImportError:
     import readline
 
+from readline_buffer_status import ReadlineBufferStatus
 from proxy import Proxy
 from parser_container import ParserContainer
 from eSocketRole import ESocketRole
 
+if typing.TYPE_CHECKING:
+    from core_parser import Parser
+
 class Application():
     def __init__(self):
-        self.DEFAULT_PARSER_MODULE = "passthrough_parser"
+        self.DEFAULT_PARSER_MODULE = 'passthrough_parser'
         self.START_TIME = time.time()
 
-        self._HISTORY_FILE = "history.log" 
+        self._HISTORY_FILE = 'history.log'
         self._variables: dict[(str, str)] = {}
         self._running = True
         self._selectedProxyName: str = None
@@ -47,7 +53,7 @@ class Application():
 
                     self._args.proxy[idx] = [localPort, remotePort, remoteHost]
             except TypeError as e:
-                print(f"Error: {e}")
+                print(f'Error: {e}')
                 arg_parser.print_usage()
                 raise e
         
@@ -57,7 +63,7 @@ class Application():
         readline.set_auto_history(False)
         readline.set_history_length(512)
         # allow for completion of !<histIdx> and $<varname>
-        # readline.set_completer_delims(readline.get_completer_delims().replace("!", "").replace("$", ""))
+        # readline.set_completer_delims(readline.get_completer_delims().replace('!', '').replace('$', ''))
         readline.set_completer_delims(' /')
         self._rbs: ReadlineBufferStatus = ReadlineBufferStatus(readline)
         # Try to load history file or create it if it doesn't exist.
@@ -67,7 +73,7 @@ class Application():
             else:
                 readline.write_history_file(self._HISTORY_FILE)
         except (PermissionError, FileNotFoundError, IsADirectoryError) as e:
-            print(f"Can not read or create {self._HISTORY_FILE}: {e}")
+            print(f'Can not read or create {self._HISTORY_FILE}: {e}')
 
         # Create a proxies and parsers based on arguments.
         if self._args.proxy is not None:
@@ -86,11 +92,11 @@ class Application():
             self.selectProxy(None)
         return
 
-    def stop(self) -> None:
+    def stop(self) -> typing.NoReturn:
         self._running = False
         return
 
-    def main(self) -> None:
+    def main(self) -> typing.NoReturn:
         # Accept user input and parse it.
         while self._running:
             try:
@@ -102,7 +108,7 @@ class Application():
                 except KeyboardInterrupt:
                     # Allow clearing the buffer with ctrl+c
                     if not readline.get_line_buffer():
-                        print("Type 'exit' or 'quit' to exit.")
+                        print('Type \'exit\' or \'quit\' to exit.')
 
                 if cmd is None:
                     continue
@@ -111,14 +117,14 @@ class Application():
                 try:
                     historyExpandedCmd = self.expandHistoryCommand(cmd)
                 except (ValueError, IndexError) as e:
-                    print(f"Error during history expansion: {e}")
+                    print(f'Error during history expansion: {e}')
                     continue
                 
                 # Expand variable substitution
                 try:
                     variableExpandedCmd = self.expandVariableCommand(historyExpandedCmd)
                 except KeyError as e:
-                    print(f"Error during variable expansion: {e}")
+                    print(f'Error during variable expansion: {e}')
                     continue
                 finally:
                     # add to the history either way.
@@ -126,28 +132,29 @@ class Application():
                 
                 # resolve escaped ! and $.
                 if cmd != variableExpandedCmd:
-                    print(f"Expanded: {variableExpandedCmd}")
+                    print(f'Expanded: {variableExpandedCmd}')
 
                 # Handle the command
                 cmdReturn = self.runCommand(variableExpandedCmd) 
                 if cmdReturn != 0:
-                    print(f"Error: {cmdReturn}")
+                    print(f'Error: {cmdReturn}')
             # pylint: disable=broad-except
             except Exception as e:
                 print(f'[EXCEPT] - User Input: {e}')
                 print(traceback.format_exc())
         
-        # Save the history file.
+        # Shutdown proxies and then wait for the threads to finish.
         for proxy in self._proxies.values():
             proxy.shutdown()
 
         for proxy in self._proxies.values():
             proxy.join()
             
+        # Save the history file.
         readline.write_history_file(self._HISTORY_FILE)
         return
 
-    def runCommand(self, cmd: str) -> object:
+    def runCommand(self, cmd: str) -> typing.Union[int, str]:
         if cmd.strip().startswith('#'):
             return 0
         if len(cmd.strip()) == 0:
@@ -159,7 +166,7 @@ class Application():
     def getPromptString(self) -> str:
         return f'[{self.getSelectedProxy()}] {self.getSelectedParser()}> '
 
-    def addToHistory(self, command: str) -> None:
+    def addToHistory(self, command: str) -> typing.NoReturn:
         lastHistoryItem = readline.get_history_item(readline.get_current_history_length())
         # Add the item to the history if not already in it.
         if command != lastHistoryItem and len(command) > 0:
@@ -171,7 +178,7 @@ class Application():
     def getSelectedProxy(self) -> Proxy:
         return self.getProxyByName(self._selectedProxyName)
 
-    def getSelectedParser(self):
+    def getSelectedParser(self) -> Parser:
         proxy = self.getSelectedProxy()
         return self.getParserByProxy(proxy)
 
@@ -197,14 +204,14 @@ class Application():
     def getProxyNameList(self) -> list[str]:
         return list(self._proxies)
 
-    def getParserByProxy(self, proxy: Proxy):
+    def getParserByProxy(self, proxy: Proxy) -> Parser:
         return self._parsers[proxy].getInstance()
 
-    def getParserByProxyName(self, name: str):
+    def getParserByProxyName(self, name: str) -> Parser:
         proxy = self.getProxyByName(name)
         return self.getParserByProxy(proxy)
 
-    def setParserForProxy(self, proxy, parserName) -> None:
+    def setParserForProxy(self, proxy: Proxy, parserName: str) -> typing.NoReturn:
         # Save old settings to put them into the new parser when applicable
         oldParser = self.getParserByProxy(proxy)
         settings = oldParser.settings
@@ -219,12 +226,12 @@ class Application():
             readline.set_completer(self.getSelectedParser().completer.complete)
         return
 
-    def setParserForProxyByName(self, proxyName, parserName) -> None:
+    def setParserForProxyByName(self, proxyName: str, parserName: str) -> typing.NoReturn:
         proxy = self.getProxyByName(proxyName)
         self.setParserForProxy(proxy, parserName)
         return
 
-    def selectProxy(self, proxy: Proxy) -> None:
+    def selectProxy(self, proxy: Proxy) -> typing.NoReturn:
         if proxy is None:
             self._selectedProxyName = None
         else:
@@ -234,15 +241,16 @@ class Application():
         readline.set_completer(self.getSelectedParser().completer.complete)
         return
 
-    def selectProxyByName(self, name: str) -> None:
+    def selectProxyByName(self, name: str) -> typing.NoReturn:
         self.selectProxy(self.getProxyByName(name))
         return
 
-    def selectProxyByNumber(self, num: int) -> None:
+    def selectProxyByNumber(self, num: int) -> typing.NoReturn:
         proxy = self.getProxyByNumber(num)
         self.selectProxy(proxy)
+        return
 
-    def createProxy(self, proxyName: str, localPort: int, remotePort: int, remoteHost: str):
+    def createProxy(self, proxyName: str, localPort: int, remotePort: int, remoteHost: str) -> typing.NoReturn:
         if proxyName is None:
             raise ValueError('proxyName must not be none.')
         if len(proxyName) == 0:
@@ -254,7 +262,7 @@ class Application():
             raise KeyError(f'There already is a proxy with the name {proxyName}.')
 
         # Create proxy and default parser
-        proxy = Proxy(self._args.bind, remoteHost, localPort, remotePort, proxyName, self.packetHandler)
+        proxy = Proxy(self._args.bind, remoteHost, localPort, remotePort, proxyName, self.packetHandler, self.outputHandler)
         parser = ParserContainer(self.DEFAULT_PARSER_MODULE, self)
         
         # Add them to their dictionaries
@@ -265,7 +273,7 @@ class Application():
         proxy.start()
         return
 
-    def killProxy(self, proxy: Proxy) -> None:
+    def killProxy(self, proxy: Proxy) -> typing.NoReturn:
         # pop proxy from he dict
         if self.getSelectedProxy() == proxy:
             self.selectProxy(None)
@@ -280,11 +288,11 @@ class Application():
         self._parsers.pop(proxy)
         return
 
-    def killProxyByName(self, proxyName: str) -> None:
+    def killProxyByName(self, proxyName: str) -> typing.NoReturn:
         self.killProxy(self.getProxyByName(proxyName))
         return
 
-    def renameProxy(self, proxy: Proxy, newName: str) -> None:
+    def renameProxy(self, proxy: Proxy, newName: str) -> typing.NoReturn:
         if newName is None:
             raise ValueError('newName must not be none.')
         if len(newName) == 0:
@@ -302,7 +310,7 @@ class Application():
         proxy.name = newName
         return
 
-    def renameProxyByName(self, oldName: str, newName: str) -> None:
+    def renameProxyByName(self, oldName: str, newName: str) -> typing.NoReturn:
         proxy = self.getProxyByName(oldName)
         self.renameProxy(proxy, newName)
         return
@@ -312,20 +320,20 @@ class Application():
 
     def getVariable(self, variableName: str) -> str:
         if not self.checkVariableName(variableName):
-            raise ValueError(f"Bad variable name: \"{variableName}\"")
+            raise ValueError(f'Bad variable name: "{variableName}"')
         
         return self._variables.get(variableName, None)
 
-    def setVariable(self, variableName: str, value: str) -> None:
+    def setVariable(self, variableName: str, value: str) -> typing.NoReturn:
         if not self.checkVariableName(variableName):
-            raise ValueError(f"Bad variable name: \"{variableName}\"")
+            raise ValueError(f'Bad variable name: "{variableName}"')
 
         self._variables[variableName] = value
         return
 
     def unsetVariable(self, variableName: str) -> bool:
         if not self.checkVariableName(variableName):
-            raise ValueError(f"Bad variable name: \"{variableName}\"")
+            raise ValueError(f'Bad variable name: "{variableName}"')
         
         if variableName not in self._variables:
             return False
@@ -333,8 +341,8 @@ class Application():
         self._variables.pop(variableName)
         return True
 
-    def clearVariables(self) -> None:
-        self._variables = {}
+    def clearVariables(self) -> typing.NoReturn:
+        self._variables: dict[str, str] = {}
 
     def checkVariableName(self, variableName: str) -> bool:
         if len(variableName) == 0:
@@ -351,18 +359,18 @@ class Application():
         return True
     
     def expandHistoryCommand(self, cmd: str) -> str:
-        words = cmd.split(" ")
+        words = cmd.split(' ')
 
         # Expand history substitution
         for idx, word in enumerate(words):
-            if word.startswith("!"):
+            if word.startswith('!'):
                 histIdx = int(word[1:]) # Let it throw ValueError to notify user.
                 if not 0 <= histIdx < readline.get_current_history_length():
-                    raise IndexError(f"History index {histIdx} is out of range.")
+                    raise IndexError(f'History index {histIdx} is out of range.')
                 
                 historyItem = readline.get_history_item(histIdx)
                 if historyItem is None:
-                    raise ValueError(f"History index {histIdx} points to invalid history entry.")
+                    raise ValueError(f'History index {histIdx} points to invalid history entry.')
                 
                 words[idx] = historyItem
 
@@ -377,7 +385,7 @@ class Application():
         word = None
         try:
             for idx, word in enumerate(words):
-                if word.startswith("$"):
+                if word.startswith('$'):
                     varname = word[1:]
                     words[idx] = self._variables[varname] # Let it throw KeyError to notify user.
         except KeyError as e:
@@ -400,41 +408,54 @@ class Application():
         # for some strange reason get_history_item is 1 based.
         return readline.get_history_item(idx + 1)
 
-    def deleteHistoryItem(self, idx: int) -> None:
+    def deleteHistoryItem(self, idx: int) -> typing.NoReturn:
         if not 0 <= idx < readline.get_history_length():
             raise IndexError(f'{idx} is not a valid history index.')
         # for some even stranger reason, remove and replace history item is 0 based!
         readline.remove_history_item(idx)
         return
 
-    def clearHistory(self) -> None:
+    def clearHistory(self) -> typing.NoReturn:
         readline.clear_history()
         return
 
-    def getCompleterFunction(self):
+    def getCompleterFunction(self) -> typing.Callable[[str, int], str]:
         return readline.get_completer()
 
-    def setCompleterFunction(self, func) -> None:
+    def setCompleterFunction(self, func: typing.Callable[[str, int], str]) -> typing.NoReturn:
         readline.set_completer(func)
         return
 
-    def packetHandler(self, data: bytes, proxy: Proxy, origin: ESocketRole) -> None:
+    def packetHandler(self, data: bytes, proxy: Proxy, origin: ESocketRole) -> typing.NoReturn:
         parser = self.getParserByProxy(proxy)
         output = parser.parse(data, proxy, origin)
-        if len(output) == 0:
+        self.outputHandler(output)
+        return
+
+    def outputHandler(self, output: list[str]) -> typing.NoReturn:
+        # Don't print a new prompt if there is no output
+        if output is None or len(output) == 0:
             return
 
-        # Get off the current line (with a prompt on it)
+        # Get clear of the prompt
         print()
-        for line in output:
-            print(line)
-        # Make some space between the output and the new prompt
+        
+        # Print the output we were given to print
+        if isinstance(output, list):
+            for line in output:
+                print(line)
+        else:
+            print(output)
+
+        # Get some space for the new prompt.
         print()
 
         # Print a new prompt with the line we currently have in the buffer
         self._rbs.update()
         print(self.getPromptString() + self._rbs.origline, end='')
         sys.stdout.flush()
+
+        return
 
 # Run
 if __name__ == '__main__':

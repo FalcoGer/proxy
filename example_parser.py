@@ -18,6 +18,10 @@
 # Removing a key from ESettingKey will cause
 # that key to be deleted on the next module reload.
 
+# will be default in python 3.11.
+# This is required for there to be no errors in the type hints.
+from __future__ import annotations
+import typing
 
 from enum import Enum, auto
 
@@ -33,10 +37,16 @@ from hexdump import Hexdump
 
 # This is the base class for the custom parser class
 import base_parser
-from readline_buffer_status import ReadlineBufferStatus as RBS
 
 # import stuff for API calls
 from eSocketRole import ESocketRole
+
+# For type hints only
+if typing.TYPE_CHECKING:
+    from proxy import Proxy
+    from application import Application
+    from readline_buffer_status import ReadlineBufferStatus as RBS
+    from core_parser import CommandDictType
 
 # For more examples of commands, completers and api calls check core and base parser file.
 
@@ -46,7 +56,7 @@ from eSocketRole import ESocketRole
 class ESettingKey(Enum):
     EXAMPLE_SETTING = auto()
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: typing.Any) -> bool:
         if other is int:
             return self.value == other
         if other is str:
@@ -55,14 +65,14 @@ class ESettingKey(Enum):
             return self.value == other.value
         return False
 
-    def __gt__(self, other) -> bool:
+    def __gt__(self, other: typing.Any) -> bool:
         if other is int:
             return self.value > other
         if other is str:
             return self.name > other
         if repr(type(self)) == repr(type(other)):
             return self.value > other.value
-        raise ValueError("Can not compare.")
+        raise ValueError('Can not compare.')
 
     def __hash__(self):
         return self.value.__hash__()
@@ -72,10 +82,10 @@ class Parser(base_parser.Parser):
     
     # Define the parser name here as it should appear in the prompt
     def __str__(self) -> str:
-        return "Example"
+        return 'Example'
 
     # Use this to set sensible defaults for your stored variables.
-    def getDefaultSettings(self) -> dict[(Enum, object)]:
+    def getDefaultSettings(self) -> dict[(Enum, typing.Any)]:
         userDefaultSettings = {
                 ESettingKey.EXAMPLE_SETTING: 'ExAmPlE'
             }
@@ -89,12 +99,12 @@ class Parser(base_parser.Parser):
 
     # Define what should happen when a packet arrives here
     # Do not print here, instead append any console output you want to the output array, one line per entry.
-    def parse(self, data: bytes, proxy, origin: ESocketRole) -> list[str]:
+    def parse(self, data: bytes, proxy: Proxy, origin: ESocketRole) -> list[str]:
         output = super().parse(data, proxy, origin)
         
         # A construct like this may be used to drop packets. 
         if data.find(b'drop') >= 0:
-            output.append("Dropped")
+            output.append('Dropped')
             return output
         
         # Do interesting stuff with the data here.
@@ -122,7 +132,7 @@ class Parser(base_parser.Parser):
     # The function is called when the command is executed, the string is the help text for that command.
     # The last completer in the completer array will be used for all words if the word index is higher than the index in the completer array.
     # If you don't want to provide more completions, use None at the end.
-    def _buildCommandDict(self) -> dict:
+    def _buildCommandDict(self) -> CommandDictType:
         ret = super()._buildCommandDict()
         
         # Add your custom commands here
@@ -135,14 +145,14 @@ class Parser(base_parser.Parser):
     # Command callbacks go here.
     
     # If a command doesn't need to know which proxy it is
-    # working on, simply use "_" as the third argument name
+    # working on, simply use '_' as the third argument name
     
     # Sends the example setting string a few times to the client.
-    def _cmd_example(self, args: list[str], proxy) -> object:
+    def _cmd_example(self, args: list[str], proxy: Proxy) -> typing.Union[int, str]:
         # args: transformation, count
         if len(args) != 3:
             print(self.getHelpText(args[0]))
-            return "Syntax error."
+            return 'Syntax error.'
         
         dataStr = str(self.getSetting(ESettingKey.EXAMPLE_SETTING))
         
@@ -154,14 +164,14 @@ class Parser(base_parser.Parser):
             pass
         else:
             print(self.getHelpText(args[0]))
-            return f"Capitalize must be 'upper', 'lower' or 'as_is', but was {args[1]}"
+            return f'Capitalize must be "upper", "lower" or "as_is", but was {args[1]}'
         
         count = self._strToInt(args[2]) # this allows hex, bin and oct notations also
         data = dataStr.encode('utf-8')
         
         # xmit count times
-        if not proxy.connected:
-            return "Not connected"
+        if not proxy.getIsConnected():
+            return 'Not connected'
 
         for _ in range(0, count):
             proxy.sendToClient(data)
@@ -174,8 +184,8 @@ class Parser(base_parser.Parser):
     # Append any options you want to be in the auto completion list to completer.candidates
     # See core_parser.py for examples
 
-    def _exampleCompleter(self, rbs: RBS) -> None:
-        options = ["upper", "lower", "as_is"]
+    def _exampleCompleter(self, rbs: RBS) -> typing.NoReturn:
+        options = ['upper', 'lower', 'as_is']
         for option in options:
             if option.startswith(rbs.being_completed):
                 self.completer.candidates.append(option)
@@ -184,7 +194,7 @@ class Parser(base_parser.Parser):
     ###########################################################################
     # No need to touch anything below here.
 
-    def __init__(self, application, settings):
+    def __init__(self, application: Application, settings: dict[Enum, typing.Any]):
         super().__init__(application, settings)
         return
 

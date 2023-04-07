@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from enum import Enum, auto
-from typing import Union
+import typing
 
 _COLOR_AVAILABLE = False
 
@@ -13,7 +15,9 @@ class ERepresentation(Enum):
     HEX = auto()
     PRINTABLE = auto()
 
-AttrType = Union[None, list[str], tuple[list[str]], tuple[list[str], list[str]]]
+if typing.TYPE_CHECKING:
+    AttrType = typing.Union[None, list[str], tuple[list[str]], tuple[list[str], list[str]]]
+
 class ColorSetting:
     def __init__(self, fg: str = None, bg: str = None, hexAttributes: AttrType = None, printableAttributes: AttrType = None):
         self.setFg(fg)
@@ -25,15 +29,15 @@ class ColorSetting:
             self.setPrintableAttributes(self.hexAttributes)
         return
 
-    def setHexAttributes(self, hexAttributes: tuple[list[str], list[str]]) -> None:
+    def setHexAttributes(self, hexAttributes: AttrType) -> typing.NoReturn:
         self.hexAttributes = self.checkAttributes(hexAttributes)
         return
     
-    def setPrintableAttributes(self, printableAttributes: tuple[list[str], list[str]]) -> None:
+    def setPrintableAttributes(self, printableAttributes: AttrType) -> typing.NoReturn:
         self.printableAttributes = self.checkAttributes(printableAttributes)
         return
 
-    def setFg(self, fg: str) -> None:
+    def setFg(self, fg: str) -> typing.NoReturn:
         if fg is None:
             self.fg = None
             return
@@ -43,7 +47,7 @@ class ColorSetting:
         self.fg = fg
         return
 
-    def setBg(self, bg: str) -> None:
+    def setBg(self, bg: str) -> typing.NoReturn:
         if bg is None:
             self.bg = None
             return
@@ -112,7 +116,7 @@ class ColorSetting:
         try:
             return termcolor.colored(dataStr, self.fg, self.bg, attr)
         except Exception as e:
-            print(f'Unable to color \"{dataStr}\" with {self}: {e}')
+            print(f'Unable to color {repr(dataStr)} with {self}: {e}')
             return dataStr
 
 class EColorSettingKey(Enum):
@@ -148,7 +152,7 @@ class EColorSettingKey(Enum):
             return self.name > other
         if repr(type(self)) == repr(type(other)):
             return self.value > other.value
-        raise ValueError("Can not compare.")
+        raise ValueError('Can not compare.')
 
     def __hash__(self):
         return int.__hash__(self.value)
@@ -170,63 +174,64 @@ class Hexdump():
         if not _COLOR_AVAILABLE:
             self.colorSettings = None
         else:
-            self.colorSettings: dict[(object, ColorSetting)] = {}
+            self.colorSettings: dict[(typing.Union[EColorSettingKey, int], ColorSetting)] = {}
         
         if defaultColors and self.colorSettings is not None:
             # color available but not set
             # Formatting
-            self.colorSettings[EColorSettingKey.ADDRESS]                 = ColorSetting("yellow", None, ['bold'])
-            self.colorSettings[EColorSettingKey.SPACER_MAJOR]            = ColorSetting()
-            self.colorSettings[EColorSettingKey.SPACER_MINOR]            = ColorSetting()
-            self.colorSettings[EColorSettingKey.BYTE_TOTAL]              = ColorSetting(None, None, ['bold', 'underline'])
+            self.colorSettings[EColorSettingKey.ADDRESS]                = ColorSetting('yellow', None, ['bold'])
+            self.colorSettings[EColorSettingKey.SPACER_MAJOR]           = ColorSetting()
+            self.colorSettings[EColorSettingKey.SPACER_MINOR]           = ColorSetting()
+            self.colorSettings[EColorSettingKey.BYTE_TOTAL]             = ColorSetting(None, None, ['bold', 'underline'])
             # Data
-            self.colorSettings[EColorSettingKey.CONTROL]                 = ColorSetting("magenta", None, ([], ['dark']))
-            self.colorSettings[EColorSettingKey.DIGITS]                  = ColorSetting("blue", None, ([], ['dark']))
-            self.colorSettings[EColorSettingKey.LETTERS]                 = ColorSetting("green", None, ([], ['dark']))
-            self.colorSettings[EColorSettingKey.PRINTABLE]               = ColorSetting("cyan", None, ([], ['dark']))
-            self.colorSettings[EColorSettingKey.PRINTABLE_HIGH_ASCII]    = ColorSetting("yellow", None, ([], ['dark']))
-            self.colorSettings[EColorSettingKey.NON_PRINTABLE]           = ColorSetting("red", None, ([], ['dark']))
-            self.colorSettings[ord(' ')]                                         = ColorSetting("green", None, ([], ['dark']), (['underline']))
-            self.colorSettings[ord('_')]                                         = ColorSetting("cyan", None, ([], ['dark']), (['underline', 'bold'], ['underline', 'dark', 'bold']))
-            self.colorSettings[0x00]                                             = ColorSetting("white", None, ([], ['dark']), (['bold'], ['bold', 'dark']))
+            self.colorSettings[EColorSettingKey.CONTROL]                = ColorSetting('magenta', None, ([], ['dark']))
+            self.colorSettings[EColorSettingKey.DIGITS]                 = ColorSetting('blue', None, ([], ['dark']))
+            self.colorSettings[EColorSettingKey.LETTERS]                = ColorSetting('green', None, ([], ['dark']))
+            self.colorSettings[EColorSettingKey.PRINTABLE]              = ColorSetting('cyan', None, ([], ['dark']))
+            self.colorSettings[EColorSettingKey.PRINTABLE_HIGH_ASCII]   = ColorSetting('yellow', None, ([], ['dark']))
+            self.colorSettings[EColorSettingKey.NON_PRINTABLE]          = ColorSetting('red', None, ([], ['dark']))
+            self.colorSettings[ord(' ')]                                = ColorSetting('green', None, ([], ['dark']), (['underline']))
+            self.colorSettings[ord('_')]                                = ColorSetting('cyan', None, ([], ['dark']), (['underline', 'bold'], ['underline', 'dark', 'bold']))
+            self.colorSettings[0x00]                                    = ColorSetting('white', None, ([], ['dark']), (['bold'], ['bold', 'dark']))
         return
 
     def __str__(self):
-        return f'Hexdump. Grouping {self.bytesPerLine}/{self.bytesPerGroup}, PrintHighAscii: {self.printHighAscii}, Sep: {repr(self.sep)}. {len(self.colorSettings)} Colors defined.'
-    def setBytesPerLine(self, bytesPerLine: int = 16) -> None:
+        return f'Grouping {self.bytesPerLine}/{self.bytesPerGroup}, PrintHighAscii: {self.printHighAscii}, Sep: {repr(self.sep)}. {len(self.colorSettings)} Colors defined.'
+
+    def setBytesPerLine(self, bytesPerLine: int = 16) -> typing.NoReturn:
         if not isinstance(bytesPerLine, int):
             raise TypeError(f'{repr(bytesPerLine)} is not {int}')
         if bytesPerLine <= 0:
-            raise ValueError("Can't set bytesPerLine below 1. Got {bytesPerLine}")
+            raise ValueError('Can\'t set bytesPerLine below 1. Got {bytesPerLine}')
 
         self.bytesPerLine = bytesPerLine
         return
 
-    def setBytesPerGroup(self, bytesPerGroup: int = 4) -> None:
+    def setBytesPerGroup(self, bytesPerGroup: int = 4) -> typing.NoReturn:
         if not isinstance(bytesPerGroup, int):
             raise TypeError(f'{repr(bytesPerGroup)} is not {int}')
         if bytesPerGroup <= 0:
-            raise ValueError(f"Can't set bytesPerLine below 1. Got {bytesPerGroup}")
+            raise ValueError(f'Can\'t set bytesPerLine below 1. Got {bytesPerGroup}')
 
         self.bytesPerGroup = bytesPerGroup
         return
     
-    def setSep(self, sep: str = '.') -> None:
+    def setSep(self, sep: str = '.') -> typing.NoReturn:
         if not isinstance(sep, str):
             raise TypeError(f'{repr(sep)} is not {str}')
         if len(sep) != 1:
-            raise ValueError(f"sep must be a string of length 1. Got {repr(sep)}")
+            raise ValueError(f'sep must be a string of length 1. Got {repr(sep)}')
         self.sep = sep
         return
 
-    def setPrintHighAscii(self, printHighAscii: bool = False) -> None:
+    def setPrintHighAscii(self, printHighAscii: bool = False) -> typing.NoReturn:
         if not isinstance(printHighAscii, bool):
             raise TypeError(f'{repr(printHighAscii)} is not {bool}')
 
         self.printHighAscii = printHighAscii
         return
 
-    def setColorSetting(self, key: object, colorSetting: ColorSetting) -> None:
+    def setColorSetting(self, key: typing.Union[EColorSettingKey, int], colorSetting: ColorSetting) -> typing.NoReturn:
         if not isinstance(key, EColorSettingKey) and not isinstance(key, int):
             raise ValueError(f'Key must be of type {repr(EColorSettingKey)} or {repr(int)}')
         if isinstance(key, int) and not 0x00 >= key >= 0xFF:
@@ -236,7 +241,7 @@ class Hexdump():
             self.colorSettings = colorSetting
         return
 
-    def unsetColorSetting(self, key: object) -> None:
+    def unsetColorSetting(self, key: typing.Any) -> typing.NoReturn:
         if not isinstance(key,  EColorSettingKey) and not isinstance(key, int):
             raise TypeError(f'Key must be of type {repr(EColorSettingKey)} or {repr(int)}')
         if isinstance(key, int) and not 0x00 >= key >= 0xFF:
@@ -247,7 +252,7 @@ class Hexdump():
         return
 
     # Returns a list of lines of a hexdump.
-    def hexdump(self, src: bytes) -> list:
+    def hexdump(self, src: bytes) -> list[str]:
         lines = []
         maxAddrLen = len(f'{(len(src)):X}')
         
@@ -266,10 +271,10 @@ class Hexdump():
         hexString = self.constructHexString(byteArray)
         printableString = self.constructPrintableString(byteArray)
         majorSpacer = self.constructMajorSpacer('   ')
-        return f"{addr}{majorSpacer}{hexString}{majorSpacer}{printableString}"
+        return f'{addr}{majorSpacer}{hexString}{majorSpacer}{printableString}'
 
     def constructAddress(self, address: int, maxAddrLen: int) -> str:
-        addrString = f"{address:0{maxAddrLen}X}"
+        addrString = f'{address:0{maxAddrLen}X}'
         if self.colorSettings is None or EColorSettingKey.ADDRESS not in self.colorSettings:
             return addrString
         return self.colorSettings[EColorSettingKey.ADDRESS].colorize(addrString)
@@ -285,12 +290,12 @@ class Hexdump():
         return self.colorSettings[EColorSettingKey.SPACER_MINOR].colorize(spacerStr)
 
     def constructHexString(self, byteArray: bytes) -> str:
-        ret = ""
+        ret = ''
         minorSpacerStr = ' '
         minorSpacer = self.constructMinorSpacer(minorSpacerStr)
 
         for idx, b in enumerate(byteArray):
-            byteRepr = f"{b:02X}"
+            byteRepr = f'{b:02X}'
             colorSetting = self.getColorSetting(b)
             if colorSetting is not None:
                 byteRepr = colorSetting.colorize(byteRepr, idx % 2 == 0, ERepresentation.HEX)
@@ -306,11 +311,11 @@ class Hexdump():
         return ret
 
     def constructPrintableString(self, byteArray: bytes) -> str:
-        ret = ""
+        ret = ''
         minorSpacer = self.constructMinorSpacer(' ')
         for idx, b in enumerate(byteArray):
             # store character representation into c
-            c = ""
+            c = ''
             if self.printHighAscii or b <= 127:
                 c = self.REPRESENTATION_ARRAY[b]
             else:
@@ -330,7 +335,7 @@ class Hexdump():
         # Add padding to line it all up
         ret += minorSpacer * self.getRequiredPaddingLength(byteArray, 1)
         
-        return f"|{ret}|"
+        return f'|{ret}|'
 
     # figure out which color setting is to be used for the byte
     def getColorSetting(self, byte: int) -> ColorSetting:
@@ -371,7 +376,7 @@ class Hexdump():
             # other printable
             colorSettingKey = EColorSettingKey.PRINTABLE
         else:
-            raise ValueError(f"Can't figure out which color setting to use for {byte:02X}")
+            raise ValueError(f'Can\'t figure out which color setting to use for {byte:02X}')
         
         colorSetting = self.colorSettings.get(colorSettingKey, None)
         if colorSetting is None:
@@ -382,10 +387,10 @@ class Hexdump():
     def constructByteTotal(self, totalBytes: int, maxAddrLen: int) -> str:
         maxAddr = self.constructAddress(totalBytes, maxAddrLen)
         majorSpacer = self.constructMajorSpacer('   ')
-        totalBytesString = f"({totalBytes} Bytes)"
+        totalBytesString = f'({totalBytes} Bytes)'
         if self.colorSettings is not None and EColorSettingKey.BYTE_TOTAL in self.colorSettings:
             totalBytesString = self.colorSettings[EColorSettingKey.BYTE_TOTAL].colorize(totalBytesString)
-        ret = f"{maxAddr}{majorSpacer}{totalBytesString}"
+        ret = f'{maxAddr}{majorSpacer}{totalBytesString}'
         return ret
 
     def getRequiredPaddingLength(self, byteArray: bytes, lenOfByteRepresentation: int) -> int:

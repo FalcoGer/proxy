@@ -1,4 +1,8 @@
 Do:
+- Naming stype eSocketRole and members
+
+- More typing, such as typing.Final
+
 - Test every command
     - core and passthrough
     - too few, too many, wrong type, bad value arguments
@@ -8,6 +12,8 @@ Do:
 
 - variable expansion format $(varname) as well as $varname
     completer also must work with this, even $(var1)$(va [TAB] should complete.
+
+- cleanup application functions
 
 - docstrings for all functions, modules and classes
 

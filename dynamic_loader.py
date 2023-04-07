@@ -4,6 +4,8 @@
 
 import importlib
 import hashlib
+from types import ModuleType
+import typing
 
 class DynamicLoader:
     def __init__(self, moduleName):
@@ -30,10 +32,10 @@ class DynamicLoader:
     def __str__(self) -> str:
         return str(self.moduleSpec)
 
-    def getModule(self):
+    def getModule(self) -> ModuleType:
         return self.module
 
-    def loadModule(self):
+    def loadModule(self) -> typing.NoReturn:
         self.moduleSpec = importlib.util.find_spec(self.moduleName)
         if self.moduleSpec is None:
             raise ImportError(f'Module {self.moduleName} not found.')
@@ -41,14 +43,14 @@ class DynamicLoader:
         self.originHash = self.calculateFileHash()
         return
 
-    def reloadModule(self):
+    def reloadModule(self) -> typing.NoReturn:
         # print(f'Reload called on {self.moduleSpec}')
         importlib.reload(self.module)
         self.originHash = self.calculateFileHash()
 
     def calculateFileHash(self) -> bytes:
         BUFF_SIZE = 4096
-        with open(self.moduleSpec.origin, "rb") as file:
+        with open(self.moduleSpec.origin, 'rb') as file:
             hashFunction = hashlib.md5()
             while buf := file.read(BUFF_SIZE):
                 hashFunction.update(buf)

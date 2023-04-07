@@ -1,6 +1,11 @@
 # This file contains base functionality that requires a proxy to be running.
 # This file is the base class for custom parsers
 
+# will be default in python 3.11.
+# This is required for there to be no errors in the type hints.
+from __future__ import annotations
+import typing
+
 # struct is used to decode bytes into primitive data types
 # https://docs.python.org/3/library/struct.html
 import struct
@@ -15,10 +20,16 @@ except ImportError:
 
 # This is the base class for the base parser
 import core_parser
-from readline_buffer_status import ReadlineBufferStatus as RBS
 
 from eSocketRole import ESocketRole
 from hexdump import Hexdump
+
+# For type hints only
+if typing.TYPE_CHECKING:
+    from proxy import Proxy
+    from application import Application
+    from core_parser import CommandDictType
+    from readline_buffer_status import ReadlineBufferStatus as RBS
 
 ###############################################################################
 # Define which settings are available here.
@@ -29,7 +40,7 @@ class EBaseSettingKey(Enum):
     PACKETNOTIFICATION_ENABLED  = auto()
     PACKET_NUMBER               = auto()
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: typing.Any) -> bool:
         if other is int:
             return self.value == other
         if other is str:
@@ -38,26 +49,26 @@ class EBaseSettingKey(Enum):
             return self.value == other.value
         return False
 
-    def __gt__(self, other) -> bool:
+    def __gt__(self, other: typing.Any) -> bool:
         if other is int:
             return self.value > other
         if other is str:
             return self.name > other
         if repr(type(self)) == repr(type(other)):
             return self.value > other.value
-        raise ValueError("Can not compare.")
+        raise ValueError('Can not compare.')
 
     def __hash__(self):
         return self.value.__hash__()
 
 class Parser(core_parser.Parser):
-    def __init__(self, application, settings: dict[(Enum, object)]):
+    def __init__(self, application: Application, settings: dict[(Enum, typing.Any)]):
         super().__init__(application, settings)
         return
 
     def __str__(self) -> str:
         # The base parser doesn't forward packets, so using it would drop them all.
-        return "BASE/DROP"
+        return 'BASE/DROP'
 
     # Return a list of setting keys. Make sure to also include the base classes keys.
     def getSettingKeys(self) -> list[Enum]:
@@ -66,7 +77,7 @@ class Parser(core_parser.Parser):
         return settingKeys
 
     # Define the defaults for each setting here.
-    def getDefaultSettings(self) -> dict[(Enum, object)]:
+    def getDefaultSettings(self) -> dict[(Enum, typing.Any)]:
         defaultSettings = {
                 EBaseSettingKey.HEXDUMP_ENABLED: True,
                 EBaseSettingKey.HEXDUMP: Hexdump(),
@@ -80,7 +91,7 @@ class Parser(core_parser.Parser):
     # Packet parsing stuff goes here.
 
     # Define what should happen when a packet arrives here
-    def parse(self, data: bytes, proxy, origin: ESocketRole) -> list[str]:
+    def parse(self, data: bytes, proxy: Proxy, origin: ESocketRole) -> list[str]:
         output = []
         # Update packet number
         pktNr = self.getSetting(EBaseSettingKey.PACKET_NUMBER) + 1
@@ -96,7 +107,7 @@ class Parser(core_parser.Parser):
             
             pktNrStr = f'[PKT# {pktNr}]'
 
-            directionStr = "[C -> S]" if origin == ESocketRole.client else "[C <- S]"
+            directionStr = '[C -> S]' if origin == ESocketRole.client else '[C <- S]'
 
             dataLenStr = f'{len(data)} Byte{"s" if len(data) > 1 else ""}'
             
@@ -111,13 +122,13 @@ class Parser(core_parser.Parser):
                 dataLenStr = termcolor.colored(dataLenStr, 'green', None, ['bold'])
 
             # TimeStamp Proxy PktNr Direction DataLength
-            output.append(f"{tsStr} - {proxyStr} {pktNrStr} {directionStr} - {dataLenStr}")
+            output.append(f'{tsStr} - {proxyStr} {pktNrStr} {directionStr} - {dataLenStr}')
         
         # Output a hexdump if enabled.
         if self.getSetting(EBaseSettingKey.HEXDUMP_ENABLED):
             hexdumpObj = self.getSetting(EBaseSettingKey.HEXDUMP)
-            hexdumpLines = "\n".join(hexdumpObj.hexdump(data))
-            output.append(f"{hexdumpLines}")
+            hexdumpLines = '\n'.join(hexdumpObj.hexdump(data))
+            output.append(f'{hexdumpLines}')
         
         # Return the output.
         return output
@@ -137,12 +148,12 @@ class Parser(core_parser.Parser):
     # The function is called when the command is executed, the string is the help text for that command.
     # The last completer in the completer array will be used for all words if the word index is higher than the index in the completer array.
     # If you don't want to provide more completions, use None at the end.
-    def _buildCommandDict(self) -> dict:
+    def _buildCommandDict(self) -> CommandDictType:
         ret = super()._buildCommandDict()
 
-        sendHexNote = "Usage: {0} <HexData> \nExample: {0} 41424344\nNote: Spaces in hex data are allowed and ignored."
-        sendStringNote = "Usage: {0} <String>\nExample: {0} hello\\!\\n\nNote: Leading spaces in the string are sent\nexcept for the space between the command and\nthe first character of the string.\nEscape sequences are available."
-        sendFileNote = "Usage: {0} filename\nExample: {0} /home/user/.bashrc"
+        sendHexNote = 'Usage: {0} <HexData> \nExample: {0} 41424344\nNote: Spaces in hex data are allowed and ignored.'
+        sendStringNote = 'Usage: {0} <String>\nExample: {0} hello\\!\\n\nNote: Leading spaces in the string are sent\nexcept for the space between the command and\nthe first character of the string.\nEscape sequences are available.'
+        sendFileNote = 'Usage: {0} filename\nExample: {0} /home/user/.bashrc'
 
         ret['hexdump']      = (self._cmd_hexdump, 'Configure the hexdump or show current configuration.\nUsage: {0} [yes|no] [<BytesPerLine>] [<BytesPerGroup>]', [self._yesNoCompleter, self._historyCompleter, self._historyCompleter, None])
         ret['notify']       = (self._cmd_notify, 'Configure packet notifications.\nUsage: {0} [yes|no]\nIf argument omitted, this will toggle the notifications.', [self._yesNoCompleter, None])
@@ -155,10 +166,10 @@ class Parser(core_parser.Parser):
 
         return ret
     
-    def _cmd_notify(self, args: list[str], _) -> object:
+    def _cmd_notify(self, args: list[str], _) -> typing.Union[int, str]:
         if not len(args) in [1, 2]:
             print(self.getHelpText(args[0]))
-            return "Syntax error."
+            return 'Syntax error.'
         
         newState = not self.getSetting(EBaseSettingKey.PACKETNOTIFICATION_ENABLED)
         if len(args) == 2:
@@ -168,86 +179,86 @@ class Parser(core_parser.Parser):
                 newState = False
             else:
                 print(self.getHelpText(args[0]))
-                return "Syntax error."
+                return 'Syntax error.'
         
         self.setSetting(EBaseSettingKey.PACKETNOTIFICATION_ENABLED, newState)
         print(f'Packet notifications are now {"enabled" if newState else "disabled"}.')
 
         return 0
 
-    def _cmd_h2s(self, args: list[str], proxy) -> object:
+    def _cmd_h2s(self, args: list[str], proxy: Proxy) -> typing.Union[int, str]:
         return self._aux_cmd_send_hex(args, ESocketRole.server, proxy)
 
-    def _cmd_h2c(self, args: list[str], proxy) -> object:
+    def _cmd_h2c(self, args: list[str], proxy: Proxy) -> typing.Union[int, str]:
         return self._aux_cmd_send_hex(args, ESocketRole.client, proxy)
 
-    def _aux_cmd_send_hex(self, args: list[str], target: ESocketRole, proxy) -> object:
+    def _aux_cmd_send_hex(self, args: list[str], target: ESocketRole, proxy: Proxy) -> typing.Union[int, str]:
         if len(args) == 1:
             print(self.getHelpText(args[0]))
-            return "Syntax error."
+            return 'Syntax error.'
 
         # Allow spaces in hex string, so join with empty string to remove them.
         userInput = ''.join(args[1:])
             
         pkt = bytes.fromhex(userInput)
-        if proxy.connected:
+        if proxy.getIsConnected():
             proxy.sendData(target, pkt)
             return 0
-        return "Not connected."
+        return 'Not connected.'
 
-    def _cmd_s2s(self, args: list[str], proxy) -> object:
+    def _cmd_s2s(self, args: list[str], proxy: Proxy) -> typing.Union[int, str]:
         return self._aux_cmd_send_string(args, ESocketRole.server, proxy)
 
-    def _cmd_s2c(self, args: list[str], proxy) -> object:
+    def _cmd_s2c(self, args: list[str], proxy: Proxy) -> typing.Union[int, str]:
         return self._aux_cmd_send_string(args, ESocketRole.client, proxy)
 
-    def _aux_cmd_send_string(self, args: list[str], target: ESocketRole, proxy) -> object:
+    def _aux_cmd_send_string(self, args: list[str], target: ESocketRole, proxy: Proxy) -> typing.Union[int, str]:
         if len(args) == 1:
             print(self.getHelpText(args[0]))
-            return "Syntax error."
+            return 'Syntax error.'
 
         userInput = ' '.join(args[1:])
 
         pkt = str.encode(userInput, 'utf-8')
         pkt = self._escape(pkt)
-        if proxy.connected:
+        if proxy.getIsConnected():
             proxy.sendData(target, pkt)
             return 0
-        return "Not connected."
+        return 'Not connected.'
 
-    def _cmd_f2s(self, args: list[str], proxy) -> object:
+    def _cmd_f2s(self, args: list[str], proxy: Proxy) -> typing.Union[int, str]:
         return self._aux_cmd_send_file(args, ESocketRole.server, proxy)
 
-    def _cmd_f2c(self, args: list[str], proxy) -> object:
+    def _cmd_f2c(self, args: list[str], proxy: Proxy) -> typing.Union[int, str]:
         return self._aux_cmd_send_file(args, ESocketRole.client, proxy)
 
-    def _aux_cmd_send_file(self, args: list[str], target: ESocketRole, proxy) -> object:
+    def _aux_cmd_send_file(self, args: list[str], target: ESocketRole, proxy: Proxy) -> typing.Union[int, str]:
         if len(args) != 2:
             print(self.getHelpText(args[0]))
-            return "Syntax error."
+            return 'Syntax error.'
         
         filePath = ' '.join(args[1:])
         if not os.path.isfile(filePath):
-            return f"File \"{filePath}\" does not exist."
+            return f'File "{filePath}" does not exist.'
         
         byteArray = b''
         try:
-            with open(filePath, "rb") as file:
+            with open(filePath, 'rb') as file:
                 while byte := file.read(1):
                     byteArray += byte
         # pylint: disable=broad-except
         except Exception as e:
-            return f"Error reading file \"{filePath}\": {e}"
+            return f'Error reading file "{filePath}": {e}'
 
-        if proxy.connected:
+        if proxy.getIsConnected():
             proxy.sendData(target, byteArray)
             return 0
-        return "Not connected."
+        return 'Not connected.'
 
-    def _cmd_hexdump(self, args: list[str], _) -> object:
+    def _cmd_hexdump(self, args: list[str], _) -> typing.Union[int, str]:
         if len(args) > 4:
             print(self.getHelpText(args[0]))
-            return "Syntax error."
+            return 'Syntax error.'
 
         enabled = self.getSetting(EBaseSettingKey.HEXDUMP_ENABLED)
         hexdumpObj: Hexdump = self.getSetting(EBaseSettingKey.HEXDUMP)
@@ -259,16 +270,16 @@ class Parser(core_parser.Parser):
                 bytesPerGroup = self._strToInt(args[3])
             except ValueError as e:
                 print(self.getHelpText(args[0]))
-                return f"Syntax error: {e}"
+                return f'Syntax error: {e}'
         
         if len(args) > 2:
             try:
                 bytesPerLine = self._strToInt(args[2])
                 if bytesPerLine < 1:
-                    raise ValueError("Can't have less than 1 byte per line.")
+                    raise ValueError('Can\'t have less than 1 byte per line.')
             except ValueError as e:
                 print(self.getHelpText(args[0]))
-                return f"Syntax error: {e}"
+                return f'Syntax error: {e}'
         
         if len(args) > 1:
             if args[1].lower() == 'yes':
@@ -277,7 +288,7 @@ class Parser(core_parser.Parser):
                 enabled = False
             else:
                 print(self.getHelpText(args[0]))
-                return "Syntax error: Must be 'yes' or 'no'."
+                return 'Syntax error: Must be "yes" or "no".'
         
         # Write back settings
         self.setSetting(EBaseSettingKey.HEXDUMP_ENABLED, enabled)
@@ -286,17 +297,17 @@ class Parser(core_parser.Parser):
 
         # Show status
         if enabled:
-            print(f"Printing hexdumps: {hexdumpObj}")
+            print(f'Printing hexdumps: {hexdumpObj}')
         else:
-            print("Not printing hexdumps.")
+            print('Not printing hexdumps.')
 
         return 0
 
     ###############################################################################
     # Completers go here.
 
-    def _yesNoCompleter(self, rbs: RBS) -> None:
-        options = ["yes", "no"]
+    def _yesNoCompleter(self, rbs: RBS) -> typing.NoReturn:
+        options = ['yes', 'no']
         for option in options:
             if option.startswith(rbs.being_completed):
                 self.completer.candidates.append(option)

@@ -1,4 +1,6 @@
 # debugging
+from __future__ import annotations
+import typing
 import traceback
 
 # For networking
@@ -14,307 +16,331 @@ from time import sleep
 
 from eSocketRole import ESocketRole
 
+if typing.TYPE_CHECKING:
+    PHType = typing.Callable[[bytes, typing.Any, ESocketRole], typing.NoReturn]
+    OHType = typing.Callable[[list[str], typing.NoReturn]]
+
 # This is where users may do live edits and alter the behavior of the proxy.
 
 class Proxy(Thread):
-    def __init__(self, bindAddr: str, remoteAddr: str, localPort: int, remotePort: int, name: str, packetHandler):
+    def __init__(self, bindAddr: str, remoteAddr: str, localPort: int, remotePort: int, name: str, packetHandler: PHType, outputHandler: OHType):
         super().__init__()
         
         self.BIND_SOCKET_TIMEOUT = 3.0 # in seconds
 
         self.name = name
-        self.packetHandler = packetHandler
+        self._packetHandler = packetHandler
+        self._outputHandler = outputHandler
 
-        self.connected = False
-        self.isShutdown = False
+        self._connected = False
+        self._isShutdown = False
 
-        self.bindAddr = bindAddr
+        self._bindAddr = bindAddr
         self.remoteAddr = remoteAddr
-        self.localPort = localPort
+        self._localPort = localPort
         self.remotePort = remotePort
         
         # Sockets
-        self.bindSocket = None
-        self.server = None
-        self.client = None
+        self._bindSocket = None
+        self._server = None
+        self._client = None
 
-        self.bind(self.bindAddr, self.localPort)
+        self._bind(self._bindAddr, self._localPort)
         
         return
 
-    def __str__(self):
-        ret = f"{self.name} ["
-        if self.isShutdown:
+    def __str__(self) -> str:
+        ret = f'{self.name} ['
+        if self._isShutdown:
             ret += 'DEAD]'
             return ret
 
-        if not self.connected:
-            if self.client is not None:
+        if not self._connected:
+            if self._client is not None:
                 ch, cp = self.getClient()
-                ret += f'C] {ch}:{cp}'
+                ret += f'C] {ch}:{cp} <---> :{self._localPort} >--->'
             else:
-                ret += f'L] {self.bindAddr}:{self.localPort}'
+                ret += f'L] {self._bindAddr} >---> :{self._localPort} X---X'
         else:
             ch, cp = self.getClient()
-            ret += f'E] {ch}:{cp} (BP: {self.localPort})'
+            ret += f'E] {ch}:{cp} <---> :{self._localPort} <--->'
         rh, rp = (self.remoteAddr, self.remotePort)
-        ret += f' - {rh}:{rp}'
+        ret += f' {rh}:{rp}'
         return ret
 
-    def run(self) -> None:
+    def run(self) -> typing.NoReturn:
         # after client disconnected await a new client connection
-        while not self.isShutdown:
-            # Wait for a client.
-            newClientHasConnected = self.waitForClient()
-            if not newClientHasConnected:
-                continue
-            
-            # Client has connected.
-            ch, cp = self.getClient()
-            print(f"[{self}] Client connected: {ch}:{cp}")
-            
-            # Connect to the remote host after a client has connected.
-            if not self.connect():
-                print(f'[{self}] Could not connect to remote host.')
-                self.client.start()
-                self.client.stop()
-                self.client.join()
-                self.client = None
-                continue
-            
-            print(f'[{self}]: Connection established.')
+        while not self._isShutdown:
+            output = []
+            try:
+                # Wait for a client.
+                newClientHasConnected = self._waitForClient()
+                if not newClientHasConnected:
+                    continue
+                
+                # Client has connected.
+                ch, cp = self.getClient()
+                output.append(f'[{self}]: Client connected: {ch}:{cp}')
+                
+                # Connect to the remote host after a client has connected.
+                output.append(f'[{self}]: Connecting to {self.remoteAddr}:{self.remotePort}')
+                if not self._connect():
+                    output.append(f'[{self}]: Could not connect to remote host.')
+                    self._client.start()
+                    self._client.stop()
+                    self._client.join()
+                    self._client = None
+                    continue
+                
+                output.append(f'[{self}]: Connection established.')
 
-            # Start client and server socket handler threads.
-            self.client.start()
-            self.server.start()
-            
-            self.connected = True
+                # Start client and server socket handler threads.
+                self._client.start()
+                self._server.start()
+                
+                self._connected = True
+            finally:
+                self._outputHandler(output)
         # Shutdown
-        if not self.client is None:
-            self.client.stop()
-            self.client.join()
-            self.client = None
-        if not self.server is None:
-            self.server.stop()
-            self.server.join()
-            self.server = None
+        if not self._bindSocket is None:
+            self._bindSocket.close()
+
+        if not self._client is None:
+            self._client.stop()
+            self._client.join()
+            self._client = None
+
+        if not self._server is None:
+            self._server.stop()
+            self._server.join()
+            self._server = None
         return
 
-    def shutdown(self) -> None:
-        self.isShutdown = True
+    def shutdown(self) -> typing.NoReturn:
+        self._isShutdown = True
         return
 
-    def sendData(self, destination: ESocketRole, data: bytes) -> None:
-        sh = self.client if destination == ESocketRole.client else self.server
+    def sendData(self, destination: ESocketRole, data: bytes) -> typing.NoReturn:
+        sh = self._client if destination == ESocketRole.client else self._server
         if sh is None:
             return
         sh.send(data)
         return
     
-    def sendToServer(self, data: bytes) -> None:
+    def sendToServer(self, data: bytes) -> typing.NoReturn:
         self.sendData(ESocketRole.server, data)
         return
     
-    def sendToClient(self, data: bytes) -> None:
+    def sendToClient(self, data: bytes) -> typing.NoReturn:
         self.sendData(ESocketRole.client, data)
         return
 
-    def getClient(self) -> (str, int):
-        if self.client is None:
+    def getClient(self) -> typing.Tuple[str, int]:
+        if self._client is None:
             return (None, None)
-        return (self.client.host, self.client.port)
+        return (self._client.getHost(), self._client.getPort())
 
-    def getServer(self) -> (str, int):
-        if self.server is None:
+    def getServer(self) -> typing.Tuple[str, int]:
+        if self._server is None:
             return (None, None)
-        return (self.server.host, self.server.port)
+        return (self._server.getHost(), self._server.getPort())
 
-    def bind(self, host: str, port: int) -> None:
-        print(f"[{self}] Starting listening socket on {host}:{port}")
-        self.bindSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.bindSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.bindSocket.bind((host, port))
-        self.bindSocket.listen(1)
-        self.bindSocket.settimeout(self.BIND_SOCKET_TIMEOUT)
+    def getBind(self) -> typing.Tuple[str, int]:
+        return (self._bindAddr, self._localPort)
 
-    def waitForClient(self) -> bool:
+    def _bind(self, host: str, port: int) -> typing.NoReturn:
+        self._outputHandler(f'[{self}]: Starting listening socket on {host}:{port}')
+        self._bindSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._bindSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._bindSocket.bind((host, port))
+        self._bindSocket.listen(1)
+        self._bindSocket.settimeout(self.BIND_SOCKET_TIMEOUT)
+
+    def _waitForClient(self) -> bool:
         try:
-            sock, _ = self.bindSocket.accept()
+            sock, _ = self._bindSocket.accept()
         except TimeoutError:
             return False
         
         # Disconnect the old client if there was one.
-        if self.client is not None:
-            self.client.stop()
-            self.client.join()
-            self.client = None
+        if self._client is not None:
+            self._client.stop()
+            self._client.join()
+            self._client = None
         
-        if self.server is not None:
-            self.server.stop()
-            self.server.join()
-            self.server = None
+        if self._server is not None:
+            self._server.stop()
+            self._server.join()
+            self._server = None
 
         # Set new client
         try:
-            self.client = SocketHandler(sock, ESocketRole.client, self)
+            self._client = SocketHandler(sock, ESocketRole.client, self)
         except (OSError, TimeoutError) as e:
-            print(f"[{self}] New client tried to connect but exception occured: {e}")
+            self._outputHandler(f'[{self}]: New client tried to connect but exception occurred: {e}')
             return False
         return True
     
-    def connect(self) -> bool:
-        print(f"[{self}] Connecting to {self.remoteAddr}:{self.remotePort}")
-        if self.server is not None:
-            raise RuntimeError(f"[{self}] Already connected to {self.server}.")
+    def _connect(self) -> bool:
+        if self._server is not None:
+            raise RuntimeError(f'[{self}]: Already connected to {self._server}.')
 
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect((self.remoteAddr, self.remotePort))
-            self.server = SocketHandler(sock, ESocketRole.server, self)
+            self._server = SocketHandler(sock, ESocketRole.server, self)
             return True
         # pylint: disable=broad-except
         except Exception as e:
-            print(f'[{self}] Unable to connect to server {self.remoteAddr}:{self.remotePort}: {e}')
+            self._outputHandler(f'[{self}]: Unable to connect to server {self.remoteAddr}:{self.remotePort}: {e}')
         return False
+    
+    def getIsConnected(self) -> bool:
+        return self._connected
 
-    def disconnect(self) -> None:
-        if self.client is not None:
-            self.client.stop()
-            self.client = None
+    def disconnect(self) -> typing.NoReturn:
+        if self._client is not None:
+            self._client.stop()
+            self._client = None
         
-        if self.server is not None:
-            self.server.stop()
-            self.server = None
+        if self._server is not None:
+            self._server.stop()
+            self._server = None
 
-        self.connected = False
-        
+        self._connected = False
         return
+
+    def getOutputHandler(self) -> OHType:
+        return self._outputHandler
+
+    def getPacketHandler(self) -> PHType:
+        return self._packetHandler
 
 ###############################################################################
 
 # This class owns a socket, receives all it's data and accepts data into a queue to be sent to that socket.
 class SocketHandler(Thread):
-    def __init__(self, sock: socket.socket, role: ESocketRole, proxy: Proxy):
+    def __init__(self, sock: socket.socket, role: ESocketRole, proxy: Proxy, readBufferSize: int = 0xFFFF):
         super().__init__()
         
-        self.sock = sock                # The socket
-        self.role = role                # Either client or server
-        self.proxy = proxy              # To disconnect on error
+        self._sock = sock                # The socket
+        self._ROLE = role                # Either client or server
+        self._proxy = proxy              # To disconnect on error
+        self._READ_BUFFER_SIZE = readBufferSize
 
         # Get this once, so there is no need to check for validity of the socket later.
-        self.host, self.port = sock.getpeername()
+        self._host, self._port = sock.getpeername()
         
         # Simple, thread-safe data structure for our messages to the socket to be queued into.
-        self.dataQueue = SimpleQueue()
+        self._dataQueue = SimpleQueue()
         
-        self.running = False
+        self._running = False
 
         # Set socket non-blocking. recv() will return if there is no data available.
-        sock.setblocking(True)
+        self._sock.setblocking(True)
 
-        self.lock = Lock()
+        self._lock = Lock()
 
-    def send(self, data: bytes) -> None:
-        self.dataQueue.put(data)
+    def send(self, data: bytes) -> typing.NoReturn:
+        self._dataQueue.put(data)
         return
 
     def getHost(self) -> str:
-        return self.host
+        return self._host
 
     def getPort(self) -> int:
-        return self.port
+        return self._port
 
-    def stop(self) -> None:
+    def stop(self) -> typing.NoReturn:
         # Cleanup of the socket is in the thread itself, in the run() function, to avoid the need for locks.
-        with self.lock:
-            self.running = False
+        with self._lock:
+            self._running = False
         return
 
-    def checkAlive(self) -> (bool, bool, bool):
+    def _getSocketStatus(self) -> typing.Tuple[bool, bool, bool]:
         try:
-            readyToRead, readyToWrite, inError = select.select([self.sock,], [self.sock,], [], 3)
+            readyToRead, readyToWrite, inError = select.select([self._sock,], [self._sock,], [], 3)
         except select.error:
             self.stop()
         return (len(readyToRead) > 0, len(readyToWrite) > 0, inError)
 
-    def sendQueue(self) -> bool:
+    def _sendQueue(self) -> bool:
         abort = False
         try:
             # Send any data which may be in the queue
-            while not self.dataQueue.empty():
-                message = self.dataQueue.get()
-                #print(f">>> Sending {len(message)} Bytes to {self.role.name}")
-                self.sock.sendall(message)
+            while not self._dataQueue.empty():
+                message = self._dataQueue.get()
+                self._sock.sendall(message)
         # pylint: disable=broad-except
         except Exception as e:
-            print(f'[EXCEPT] - xmit data to {self}: {e}')
+            self._proxy.getOutputHandler()(f'[EXCEPT] - xmit data to {self}: {e}')
             abort = True
         return abort
 
     def __str__(self) -> str:
-        return f'{self.role.name} [{self.host}:{self.port}]'
+        return f'{self._ROLE.name} [{self._host}:{self._port}]'
 
-    def run(self) -> None:
-        if self.sock is None:
+    def run(self) -> typing.NoReturn:
+        if self._sock is None:
             raise RuntimeError('Socket has expired. Can not start again after shutdown.')
-        with self.lock:
-            self.running = True
+        with self._lock:
+            self._running = True
         localRunning = True
         while localRunning:
             # Receive data from the host.
             data = False
             abort = False
 
-            readyToRead, readyToWrite, _ = self.checkAlive()
+            readyToRead, readyToWrite, _ = self._getSocketStatus()
 
             if readyToRead:
                 # pylint: disable=broad-except
                 try:
-                    data = self.sock.recv(4096)
+                    data = self._sock.recv(self._READ_BUFFER_SIZE)
                     if len(data) == 0:
-                        raise IOError("Socket Disconnected")
+                        raise IOError('Socket Disconnected')
                 except BlockingIOError:
                     # No data was available at the time.
                     pass
                 except Exception as e:
-                    print(f'[EXCEPT] - recv data from {self}: {e}')
+                    self._proxy.getOutputHandler()(f'[EXCEPT] - recv data from {self}: {e}')
                     abort = True
             
             # If we got data, parse it.
             if data:
                 try:
-                    self.proxy.packetHandler(data, self.proxy, self.role)
+                    self._proxy.getPacketHandler()(data, self._proxy, self._ROLE)
                 # pylint: disable=broad-except
                 except Exception as e:
-                    print(f'[EXCEPT] - parse data from {self}: {e}')
-                    print(traceback.format_exc())
-                    self.proxy.disconnect()
+                    output = [f'[EXCEPT] - parse data from {self}: {e}', traceback.format_exc()]
+                    self._proxy.getOutputHandler()(output)
+                    self._proxy.disconnect()
             
             # Send the queue
-            queueEmpty = self.dataQueue.empty()
-            readyToRead, readyToWrite, _ = self.checkAlive()
+            queueEmpty = self._dataQueue.empty()
+            readyToRead, readyToWrite, _ = self._getSocketStatus()
             abort2 = False
             if not queueEmpty and readyToWrite:
-                abort2 = self.sendQueue()
+                abort2 = self._sendQueue()
             
             if abort or abort2:
-                self.proxy.disconnect()
+                self._proxy.disconnect()
 
             # Prevent the CPU from Melting
             # Sleep if we didn't get any data or if we didn't send
             if not data and (queueEmpty or not readyToWrite):
                 sleep(0.001)
             
-            with self.lock:
-                localRunning = self.running
+            with self._lock:
+                localRunning = self._running
         
         # Stopped, clean up socket.
         # Send all remaining messages.
         sleep(0.1)
-        self.sendQueue()
+        self._sendQueue()
         sleep(0.1)
 
-        self.sock.close()
-        self.sock = None
+        self._sock.close()
+        self._sock = None
         return
 

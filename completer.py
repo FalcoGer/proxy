@@ -1,12 +1,20 @@
+from __future__ import annotations
+import typing
+
 import traceback
-from readline_buffer_status import ReadlineBufferStatus as RBS
+
+if typing.TYPE_CHECKING:
+    from application import Application
+    from core_parser import Parser, CommandDictType
+    from readline_buffer_status import ReadlineBufferStatus as RBS
 
 class Completer():
-    def __init__(self, application, parser):
+    def __init__(self, application: Application, parser: Parser):
         self.application = application
         self.parser = parser
 
-        self.candidates = []        # Functions append strings that would complete the current word here.
+        self.candidates: list[str] = []        # Functions append strings that would complete the current word here.
+        return
     
     # pylint: disable=unused-argument
     def complete(self, text: str, state: int) -> str:
@@ -19,12 +27,12 @@ class Completer():
 
                 self.candidates = []
                 
-                cmdDict = self.parser.commandDictionary
+                cmdDict: CommandDictType = self.parser.commandDictionary
 
-                if rbs.being_completed.startswith("!"):
+                if rbs.being_completed.startswith('!'):
                     # completing history substitution
                     self.getHistIdxCandidates(True, rbs)
-                elif rbs.being_completed.startswith("$"):
+                elif rbs.being_completed.startswith('$'):
                     # completing variable
                     self.getVariableCandidates(True, rbs)
                 elif rbs.wordIdx == 0:
@@ -66,7 +74,7 @@ class Completer():
             try:
                 response = self.candidates[state]
                 # expand the history completion to the full line
-                if len(self.candidates) == 1 and response is not None and len(response) > 0 and response[0] == "!":
+                if len(self.candidates) == 1 and response is not None and len(response) > 0 and response[0] == '!':
                     histIdx = int(response[1:])
                     response = self.application.getHistoryItem(histIdx)
             except IndexError:
@@ -78,11 +86,11 @@ class Completer():
         
         return response
     
-    def getHistIdxCandidates(self, includePrefix: bool, rbs: RBS) -> None:
+    def getHistIdxCandidates(self, includePrefix: bool, rbs: RBS) -> typing.NoReturn:
         # Complete possible values only if there is not a complete match.
         # If there is a complete match, return that one only.
-        # For example if completing "!3" but "!30" and "!31" are also available
-        # then return only "!3".
+        # For example if completing '!3' but '!30' and '!31' are also available
+        # then return only '!3'.
 
         historyLines = self.application.getHistoryList()
         historyIndexes = list(idx for idx, _ in enumerate(historyLines))
@@ -107,20 +115,20 @@ class Completer():
         # If there has not been a complete match, look for other matches.
         for historyIdx in historyIndexes:
             historyLine = self.application.getHistoryItem(historyIdx)
-            if historyLine is None or historyLine == "":
+            if historyLine is None or len(historyLine) == 0:
                 # Skip invalid options.
                 continue
 
             if str(historyIdx).startswith(rbs.being_completed[(1 if includePrefix else 0):]):
-                self.candidates.append(("!" if includePrefix else "") + str(historyIdx))
+                self.candidates.append(('!' if includePrefix else '') + str(historyIdx))
         return
     
-    def getVariableCandidates(self, includePrefix: bool, rbs: RBS) -> None:
+    def getVariableCandidates(self, includePrefix: bool, rbs: RBS) -> typing.NoReturn:
         # TODO: allow for $(varname) format also
         # make sure that $(varname)$(varname) also works.
         for variableName in self.application.getVariableNames():
-            if (("$" if includePrefix else "") + variableName).startswith(rbs.being_completed):
-                self.candidates.append(("$" if includePrefix else "") + variableName)
+            if (('$' if includePrefix else '') + variableName).startswith(rbs.being_completed):
+                self.candidates.append(('$' if includePrefix else '') + variableName)
         return
 
 
