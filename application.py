@@ -180,12 +180,15 @@ class Application():
         return f'[{self.getSelectedProxy()}] {self.getSelectedParser()}> '
 
     def addToHistory(self, command: str) -> typing.NoReturn:
-        lastHistoryItem = readline.get_history_item(readline.get_current_history_length())
+        lastHistoryItem = None
+        if readline.get_current_history_length() > 0:
+            lastHistoryItem = readline.get_history_item(readline.get_current_history_length())
         # Add the item to the history if not already in it.
         if command != lastHistoryItem and len(command) > 0:
-            # Reloading the history file doesn't seem to fix it.
             readline.add_history(command)
-            readline.append_history_file(1, self._HISTORY_FILE)
+            if sys.platform != 'win32':
+                # doesn't work with pyreadline3
+                readline.append_history_file(1, self._HISTORY_FILE)
         return
 
     def getSelectedProxy(self) -> Proxy:
