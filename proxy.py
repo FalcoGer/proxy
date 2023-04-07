@@ -58,9 +58,9 @@ class Proxy(Thread):
         if not self._connected:
             if self._client is not None:
                 ch, cp = self.getClient()
-                ret += f'C] {ch}:{cp} <---> :{self._localPort} >--->'
+                ret += f'C] {ch}:{cp} <---> :{self._localPort} >---X'
             else:
-                ret += f'L] {self._bindAddr} >---> :{self._localPort} X---X'
+                ret += f'L] {self._bindAddr} X---> :{self._localPort} X---X'
         else:
             ch, cp = self.getClient()
             ret += f'E] {ch}:{cp} <---> :{self._localPort} <--->'
