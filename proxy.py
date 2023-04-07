@@ -92,13 +92,13 @@ class Proxy(Thread):
                     self._client = None
                     continue
                 
-                output.append(f'[{self}]: Connection established.')
-
                 # Start client and server socket handler threads.
                 self._client.start()
                 self._server.start()
                 
                 self._connected = True
+                
+                output.append(f'[{self}]: Connection established.')
             finally:
                 self._outputHandler(output)
         # Shutdown
