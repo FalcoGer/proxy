@@ -13,7 +13,11 @@ import time
 try:
     import gnureadline as readline
 except ImportError:
-    import readline
+    try:
+        import readline
+    except ImportError:
+        from pyreadline3 import Readline
+        readline = Readline()
 
 from readline_buffer_status import ReadlineBufferStatus
 from proxy import Proxy
