@@ -35,6 +35,8 @@ class Application():
         self._proxies: dict[(str, Proxy)] = {}
         self._parsers: dict[(Proxy, ParserContainer)] = {None: ParserContainer('core_parser', self)}
         
+        self._printPrompt: bool = True
+
         # parse command line arguments.
         arg_parser = argparse.ArgumentParser(description='Create multiple proxy connections. Provide multiple proxy parameters to create multiple proxies.')
         arg_parser.add_argument('-b', '--bind', metavar=('binding_address'), required=False, help='Bind IP-address for the listening socket. Default \'0.0.0.0\'', default='0.0.0.0')
@@ -83,6 +85,7 @@ class Application():
                 remoteHost = proxyArgs[2]
 
                 name = f'PROXY_{localPort}'
+
                 self.createProxy(name, localPort, remotePort, remoteHost)
                 # Select the first proxy
                 if idx == 0:
@@ -261,8 +264,14 @@ class Application():
         if proxyName in self._proxies:
             raise KeyError(f'There already is a proxy with the name {proxyName}.')
 
+        # This prevents printing prompts when initially starting
+        # and when calling new, which would result
+        # in a new prompt anyway from the input() call in main
+        self._printPrompt = False
+
         # Create proxy and default parser
         proxy = Proxy(self._args.bind, remoteHost, localPort, remotePort, proxyName, self.packetHandler, self.outputHandler)
+        self._printPrompt = True
         parser = ParserContainer(self.DEFAULT_PARSER_MODULE, self)
         
         # Add them to their dictionaries
@@ -446,15 +455,15 @@ class Application():
                 print(line)
         else:
             print(output)
+        if self._printPrompt:
+            # Get some space for the new prompt.
+            print()
 
-        # Get some space for the new prompt.
-        print()
-
-        # Print a new prompt with the line we currently have in the buffer
-        self._rbs.update()
-        print(self.getPromptString() + self._rbs.origline, end='')
+            # Print a new prompt with the line we currently have in the buffer
+            self._rbs.update()
+            print(self.getPromptString() + self._rbs.origline, end='')
+        
         sys.stdout.flush()
-
         return
 
 # Run

@@ -30,11 +30,6 @@ Fix:
 - strange behavior when cursor not at end of line when packets are handled
     - moving cursor causes issues
     - getting output puts that output in the middle of the input line
-- double prompt when calling `new`
-    -> because creating a new proxy produces output, which calls outputHandler
-        but finished commands (new) also call output handler.
-        and output handler prints the prompt
-        I guess I have to live with it for now...
 
 Ideas:
 - Allow "proxies" with connection to remote or listening sockets only to have the proxy act as the server/client, ie. a more fancy netcat
@@ -42,3 +37,10 @@ Ideas:
     would allow sending more complex data than with netcat, and easily send files without reconnecting
 
 - Allow MitM SSL?
+
+- IPv6 support
+
+- SOCKS4, SOCKS5, HTTP, HTTPS proxy in addition to raw tcp packet forwarding?
+    With login?
+    Chain to remote SOCKS4, SOCKS5, HTTP or HTTPS proxy (like TOR)?
+
