@@ -3,6 +3,7 @@
 # be reloaded and a function to actually reload it.
 
 import importlib
+import importlib.util
 import hashlib
 import typing
 
