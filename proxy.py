@@ -17,7 +17,7 @@ from time import sleep
 from eSocketRole import ESocketRole
 
 if typing.TYPE_CHECKING:
-    PHType = typing.Callable[[bytes, typing.Any, ESocketRole], typing.NoReturn]
+    PHType = typing.Callable[[bytes, 'Proxy', ESocketRole], typing.NoReturn]
     OHType = typing.Callable[[list[str], typing.NoReturn]]
 
 # This is where users may do live edits and alter the behavior of the proxy.

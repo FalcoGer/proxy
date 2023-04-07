@@ -4,8 +4,10 @@
 
 import importlib
 import hashlib
-from types import ModuleType
 import typing
+
+if typing.TYPE_CHECKING:
+    from types import ModuleType
 
 class DynamicLoader:
     def __init__(self, moduleName):
