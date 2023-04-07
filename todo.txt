@@ -30,7 +30,7 @@ Fix:
 - strange behavior when cursor not at end of line when packets are handled
     - moving cursor causes issues
     - getting output puts that output in the middle of the input line
-- no prompt after connection/disconnect/other messages.
+- use outputHandler for any and all prints that are not the result of commands.
 
 Ideas:
 - Allow "proxies" with connection to remote or listening sockets only to have the proxy act as the server/client, ie. a more fancy netcat

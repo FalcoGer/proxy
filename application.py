@@ -194,7 +194,7 @@ class Application():
             return list(self._proxies.values())[num]
         # ID not found, maybe port number?
         for proxy in self._proxies.values():
-            if proxy.localPort == num:
+            if proxy.getBind()[1] == num:
                 return proxy
         raise IndexError(f'No proxy found with either local port or index {num}.')
 
