@@ -16,11 +16,16 @@ from time import sleep
 
 from eSocketRole import ESocketRole
 
+try:
+    import setproctitle
+    _SETPROCTITLE_AVAILABLE = True
+    _PROCTITLE_MAX_CHARS = 15 # Maximum length of a process title is 15 Bytes.
+except ImportError:
+    _SETPROCTITLE_AVAILABLE = False
+
 if typing.TYPE_CHECKING:
     PHType = typing.Callable[[bytes, 'Proxy', ESocketRole], typing.NoReturn]
     OHType = typing.Callable[[list[str], typing.NoReturn]]
-
-# This is where users may do live edits and alter the behavior of the proxy.
 
 class Proxy(Thread):
     def __init__(self, bindAddr: str, remoteAddr: str, localPort: int, remotePort: int, name: str, packetHandler: PHType, outputHandler: OHType):
@@ -71,6 +76,9 @@ class Proxy(Thread):
         # after client disconnected await a new client connection until shutdown.
         while not self._isShutdown:
             output = []
+            # update thread title
+            if _SETPROCTITLE_AVAILABLE and setproctitle.getthreadtitle() != self.name[:_PROCTITLE_MAX_CHARS]:
+                setproctitle.setthreadtitle(self.name[:_PROCTITLE_MAX_CHARS])
             try:
                 # Wait for a client.
                 newClientHasConnected = self._waitForClient()
@@ -214,7 +222,6 @@ class Proxy(Thread):
 # This class owns a socket, receives all it's data and accepts data into a queue to be sent to that socket.
 class SocketHandler(Thread):
     def __init__(self, sock: socket.socket, role: ESocketRole, proxy: Proxy, outputHandler: OHType, packetHandler: PHType, readBufferSize: int = 0xFFFF):
-        super().__init__()
         
         self._sock = sock                # The socket
         self._ROLE = role                # Either client or server
@@ -226,6 +233,9 @@ class SocketHandler(Thread):
         # Get this once, so there is no need to check for validity of the socket later.
         self._host, self._port = sock.getpeername()
         
+        # Set thread name and initialize thread base class.
+        super().__init__(name=self._getName())
+        
         # Simple, thread-safe data structure for our messages to the socket to be queued into.
         self._dataQueue = SimpleQueue()
         
@@ -235,6 +245,9 @@ class SocketHandler(Thread):
         self._sock.setblocking(True)
 
         self._lock = Lock()
+
+    def _getName(self) -> str:
+        return ('C' if self._ROLE == ESocketRole.client else 'S') + f'_{self._proxy.name}'
 
     def send(self, data: bytes) -> typing.NoReturn:
         self._dataQueue.put(data)
@@ -286,6 +299,11 @@ class SocketHandler(Thread):
         # run until stop() is called.
         while localRunning:
             output = []
+        
+            # Update thread title
+            if _SETPROCTITLE_AVAILABLE and setproctitle.getthreadtitle() != self._getName()[:_PROCTITLE_MAX_CHARS]:
+                setproctitle.setthreadtitle(self._getName()[:_PROCTITLE_MAX_CHARS])
+
             try: # Try-Finally block for output.
                 # Receive data from the host.
                 data = False
