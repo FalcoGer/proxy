@@ -6,8 +6,10 @@ import importlib
 import hashlib
 import typing
 
+from types import ModuleType # Needs to be outside of typing.TYPE_CHECKING for some reason.
 if typing.TYPE_CHECKING:
-    from types import ModuleType
+    pass
+
 
 class DynamicLoader:
     def __init__(self, moduleName):
