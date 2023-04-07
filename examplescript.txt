@@ -3,3 +3,5 @@
 new 4444 4445 localhost MyProxy example_parser
 select MyProxy
 set httpGet GET / HTTP/1.0\n\n
+new 4446 4447 localhost Proxy2 base_parser
+select 1

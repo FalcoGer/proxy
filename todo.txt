@@ -30,7 +30,11 @@ Fix:
 - strange behavior when cursor not at end of line when packets are handled
     - moving cursor causes issues
     - getting output puts that output in the middle of the input line
-- use outputHandler for any and all prints that are not the result of commands.
+- double prompt when calling `new`
+    -> because creating a new proxy produces output, which calls outputHandler
+        but finished commands (new) also call output handler.
+        and output handler prints the prompt
+        I guess I have to live with it for now...
 
 Ideas:
 - Allow "proxies" with connection to remote or listening sockets only to have the proxy act as the server/client, ie. a more fancy netcat
