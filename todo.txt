@@ -3,6 +3,15 @@ Do:
 
 - More typing, such as typing.Final
 
+- Replace readline/pyreadline3 with python-prompt-toolkit
+    https://github.com/prompt-toolkit/python-prompt-toolkit
+    - replace completion
+        see fix: autocomplete not working in windows
+        https://python-prompt-toolkit.readthedocs.io/en/stable/pages/asking_for_input.html#autocompletion
+    - Make layouts to separate output from prompt https://python-prompt-toolkit.readthedocs.io/en/stable/pages/full_screen_apps.html
+    - replace colorama with https://python-prompt-toolkit.readthedocs.io/en/stable/pages/printing_text.html#ansi
+
+
 - Test every command
     - core and passthrough
     - too few, too many, wrong type, bad value arguments
@@ -30,6 +39,8 @@ Fix:
 - strange behavior when cursor not at end of line when packets are handled
     - moving cursor causes issues
     - getting output puts that output in the middle of the input line
+- Autocomplete not working in windows.
+
 
 Ideas:
 - Allow "proxies" with connection to remote or listening sockets only to have the proxy act as the server/client, ie. a more fancy netcat

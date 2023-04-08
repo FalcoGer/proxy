@@ -13,7 +13,7 @@ if typing.TYPE_CHECKING:
 
 
 class DynamicLoader:
-    def __init__(self, moduleName):
+    def __init__(self, moduleName: str):
         self.moduleName = moduleName
         self.originHash: bytes = None
         self.moduleSpec = None
@@ -52,6 +52,7 @@ class DynamicLoader:
         # print(f'Reload called on {self.moduleSpec}')
         importlib.reload(self.module)
         self.originHash = self.calculateFileHash()
+        return
 
     def calculateFileHash(self) -> bytes:
         BUFF_SIZE = 4096
@@ -60,5 +61,4 @@ class DynamicLoader:
             while buf := file.read(BUFF_SIZE):
                 hashFunction.update(buf)
             return hashFunction.digest()
-
 
