@@ -10,7 +10,7 @@ Do:
         https://python-prompt-toolkit.readthedocs.io/en/stable/pages/asking_for_input.html#autocompletion
     - Make layouts to separate output from prompt https://python-prompt-toolkit.readthedocs.io/en/stable/pages/full_screen_apps.html
     - replace colorama with https://python-prompt-toolkit.readthedocs.io/en/stable/pages/printing_text.html#ansi
-
+    - eventually replace termcolor (hexdump and base_parser)
 
 - Test every command
     - core and passthrough
