@@ -9,22 +9,13 @@ import argparse
 import traceback
 import time
 
-# This allows auto completion and history browsing
-if sys.platform == 'linux':
-    # pylint: disable=import-error
-    try:
-        import gnureadline as readline
-    except ImportError:
-        import readline
-elif sys.platform == 'win32':
-    # pylint: disable=import-error
-    from pyreadline3 import Readline
-    readline = Readline()
-    
-    # Enable ANSI sequence color output in windows.
-    import colorama
+# prompt_toolkit allows custom inputs and formatted outputs as well as provide some
+# neat functionality such as toolbars, button prompts, progress bars and more
+# REF: https://python-prompt-toolkit.readthedocs.io/en/stable/pages/getting_started.html
+import prompt_toolkit as pt
+from prompt_toolkit import print_formatted_text as print
+from prompt_toolkit.formatted_text import HTML, to_formatted_text
 
-from readline_buffer_status import ReadlineBufferStatus
 from proxy import Proxy
 from parser_container import ParserContainer
 from eSocketRole import ESocketRole
@@ -44,15 +35,13 @@ class Application():
         self._proxies: dict[(str, Proxy)] = {}
         self._parsers: dict[(Proxy, ParserContainer)] = {None: ParserContainer('core_parser', self)}
         
-        self._printPrompt: bool = True
-
         # parse command line arguments.
         arg_parser = argparse.ArgumentParser(description='Create multiple proxy connections. Provide multiple proxy parameters to create multiple proxies.')
         arg_parser.add_argument('-b', '--bind', metavar=('binding_address'), required=False, help='Bind IP-address for the listening socket. Default \'0.0.0.0\'', default='0.0.0.0')
         arg_parser.add_argument('-p', '--proxy', nargs=3, metavar=('lp', 'rp', 'host'), action='append', required=False, help='Local port to listen on as well as the remote port and host ip address or hostname for the proxy to connect to.')
 
         self._args = arg_parser.parse_args()
-
+        
         # Fix proxy argument Typing since nargs > 1 doesn't support multiple types such as (int, int, str)
         # REF: https://github.com/python/cpython/issues/82398
         if self._args.proxy is not None:
@@ -68,25 +57,9 @@ class Application():
                 arg_parser.print_usage()
                 raise e
         
-        # Setup readline
-        readline.parse_and_bind('tab: complete')
-        readline.parse_and_bind('set editing-mode vi')
-        if sys.platform != 'win32':
-            readline.set_auto_history(False)
-        readline.set_history_length(512)
-        # allow for completion of !<histIdx> and $<varname>
-        # readline.set_completer_delims(readline.get_completer_delims().replace('!', '').replace('$', ''))
-        readline.set_completer_delims(' /')
-        self._rbs: ReadlineBufferStatus = ReadlineBufferStatus(readline)
-        # Try to load history file or create it if it doesn't exist.
-        try:
-            if os.path.exists(self._HISTORY_FILE):
-                readline.read_history_file(self._HISTORY_FILE)
-            else:
-                readline.write_history_file(self._HISTORY_FILE)
-        except (PermissionError, FileNotFoundError, IsADirectoryError) as e:
-            print(f'Can not read or create {self._HISTORY_FILE}: {e}')
-
+        # Setup the input system
+        self.setupInput()
+        
         # Create a proxies and parsers based on arguments.
         if self._args.proxy is not None:
             for idx, proxyArgs in enumerate(self._args.proxy):
@@ -115,12 +88,15 @@ class Application():
             try:
                 try:
                     print() # Empty line
+                    # Set toolbar
+                    self._sess.bottom_toolbar = f'{self.getSelectedProxy()}'
+                    # Fetch command
                     cmd = None
-                    prompt = self.getPromptString()                    
-                    cmd = input(f'{prompt}')
+                    cmd = self._sess.prompt(f'{self.getSelectedParser()} >')
                 except KeyboardInterrupt:
                     # Allow clearing the buffer with ctrl+c
-                    if not readline.get_line_buffer():
+                    # TODO: find out how to check for empty buffer
+                    if True:
                         print('Type \'exit\' or \'quit\' to exit.')
 
                 if cmd is None:
@@ -162,9 +138,6 @@ class Application():
 
         for proxy in self._proxies.values():
             proxy.join()
-            
-        # Save the history file.
-        readline.write_history_file(self._HISTORY_FILE)
         return
 
     def runCommand(self, cmd: str) -> typing.Union[int, str]:
@@ -176,19 +149,13 @@ class Application():
         cmd = cmd.replace('\\!', '!').replace('\\$', '$')
         return self.getSelectedParser().handleUserInput(cmd, self.getSelectedProxy())
 
-    def getPromptString(self) -> str:
-        return f'[{self.getSelectedProxy()}] {self.getSelectedParser()}> '
-
     def addToHistory(self, command: str) -> typing.NoReturn:
         lastHistoryItem = None
-        if readline.get_current_history_length() > 0:
-            lastHistoryItem = readline.get_history_item(readline.get_current_history_length())
+        if len(self._sess.history.get_strings()) > 0:
+            lastHistoryItem = self._sess.history.get_strings()[-1]
         # Add the item to the history if not already in it.
         if command != lastHistoryItem and len(command) > 0:
-            readline.add_history(command)
-            if sys.platform != 'win32':
-                # doesn't work with pyreadline3
-                readline.append_history_file(1, self._HISTORY_FILE)
+            self._sess.history.append_string(command)
         return
 
     def getSelectedProxy(self) -> Proxy:
@@ -239,7 +206,7 @@ class Application():
 
         # Need to reload the completer if the current proxy got it's parser changed
         if proxy.name == self._selectedProxyName:
-            readline.set_completer(self.getSelectedParser().completer.complete)
+            self.setCompleter(newParserContainer.getInstance().completer)
         return
 
     def setParserForProxyByName(self, proxyName: str, parserName: str) -> typing.NoReturn:
@@ -254,7 +221,7 @@ class Application():
             self._selectedProxyName = proxy.name
         
         # reload the correct completer
-        readline.set_completer(self.getSelectedParser().completer.complete)
+        self.setCompleter(self.getSelectedParser().completer)
         return
 
     def selectProxyByName(self, name: str) -> typing.NoReturn:
@@ -277,14 +244,8 @@ class Application():
         if proxyName in self._proxies:
             raise KeyError(f'There already is a proxy with the name {proxyName}.')
 
-        # This prevents printing prompts when initially starting
-        # and when calling new, which would result
-        # in a new prompt anyway from the input() call in main
-        self._printPrompt = False
-
         # Create proxy and default parser
         proxy = Proxy(self._args.bind, remoteHost, localPort, remotePort, proxyName, self.packetHandler, self.outputHandler)
-        self._printPrompt = True
         parser = ParserContainer(self.DEFAULT_PARSER_MODULE, self)
         
         # Add them to their dictionaries
@@ -387,13 +348,10 @@ class Application():
         for idx, word in enumerate(words):
             if word.startswith('!'):
                 histIdx = int(word[1:]) # Let it throw ValueError to notify user.
-                if not 0 <= histIdx < readline.get_current_history_length():
+                if not 0 <= histIdx < len(self._sess.history.get_strings()):
                     raise IndexError(f'History index {histIdx} is out of range.')
                 
-                historyItem = readline.get_history_item(histIdx)
-                if historyItem is None:
-                    raise ValueError(f'History index {histIdx} points to invalid history entry.')
-                
+                historyItem = self._sess.history.get_strings()[histIdx]
                 words[idx] = historyItem
 
         # Save it to a different variable to save this modified command to the history.
@@ -417,35 +375,38 @@ class Application():
         variableExpandedCmd = ' '.join(words)
         return variableExpandedCmd
     
-    def getReadlineBufferStatus(self) -> ReadlineBufferStatus:
-        self._rbs.update()
-        return self._rbs
-
     def getHistoryList(self) -> list[str]:
-        return list(self.getHistoryItem(x) for x in range(0, readline.get_history_length()))
+        return self._sess.history.get_strings()
 
     def getHistoryItem(self, idx: int) -> str:
-        if not 0 <= idx < readline.get_history_length():
+        if not 0 <= idx < len(self._sess.history.get_strings()):
             raise IndexError(f'{idx} is not a valid history index.')
-        # for some strange reason get_history_item is 1 based.
-        return readline.get_history_item(idx + 1)
+        return self._sess.history.get_strings()[idx]
 
     def deleteHistoryItem(self, idx: int) -> typing.NoReturn:
-        if not 0 <= idx < readline.get_history_length():
+        if not 0 <= idx < len(self._sess.history.get_strings()):
             raise IndexError(f'{idx} is not a valid history index.')
-        # for some even stranger reason, remove and replace history item is 0 based!
-        readline.remove_history_item(idx)
+        # Store the list, remove the item, delete the file
+        # and rewrite the file with all entries except the one removed.
+        historyList = self.getHistoryList()
+        os.remove(self._HISTORY_FILE)
+        self.setupInput()
+        for i, historyItem in enumerate(historyList):
+            if i == idx:
+                continue
+            self.addToHistory(historyItem)
         return
 
     def clearHistory(self) -> typing.NoReturn:
-        readline.clear_history()
+        os.remove(self._HISTORY_FILE)
+        self.setupInput()
         return
 
-    def getCompleterFunction(self) -> typing.Callable[[str, int], str]:
-        return readline.get_completer()
+    def getCompleter(self) -> typing.Callable[[str, int], str]:
+        return self._sess.completer
 
-    def setCompleterFunction(self, func: typing.Callable[[str, int], str]) -> typing.NoReturn:
-        readline.set_completer(func)
+    def setCompleter(self, completer: pt.completion.Completer) -> typing.NoReturn:
+        self._sess.completer = completer
         return
 
     def packetHandler(self, data: bytes, proxy: Proxy, origin: ESocketRole) -> typing.NoReturn:
@@ -468,21 +429,41 @@ class Application():
                 print(line)
         else:
             print(output)
-        if self._printPrompt:
-            # Get some space for the new prompt.
-            print()
-
-            # Print a new prompt with the line we currently have in the buffer
-            self._rbs.update()
-            print(self.getPromptString() + self._rbs.origline, end='')
+        # Printing a new prompt is not required
+        # here since prompt_toolkit does that automatically
         
         sys.stdout.flush()
         return
 
+    def setupInput(self) -> typing.NoReturn:
+        # Enable history file
+        try:
+            history = pt.history.FileHistory(filename=self._HISTORY_FILE)
+        except (OSError, PermissionError, IsADirectoryError, IOError) as e:
+            print(pt.HTML('<ansired>Error while trying to open history:</ansired>') + f'{e}')
+            self._HISTORY_FILE = None # This is done to prevent messing with the file after there has been an error with it.
+            history = pt.history.InMemoryHistory()
+        self._sess: pt.PromptSession = pt.PromptSession(history=history)
+        
+        # Set completer
+        self._sess.completer = self.getSelectedParser().completer
+
+        # Automatically suggest from history
+        self._sess.auto_suggest = pt.auto_suggest.AutoSuggestFromHistory()
+        
+        # Disable mouse support to allow scrolling of
+        # the text in the console via terminal emulator.
+        self._sess.mouse_support = False
+
+        # Allow async completion
+        self._sess.complete_in_thread = True
+        return
+
+    def escapeHTML(self, s: str) -> str:
+        return s.replace('&', '&amp;').replace('<', '&lt;').replace('>','&gt;')
+
 # Run
 if __name__ == '__main__':
-    if sys.platform == 'win32':
-        colorama.just_fix_windows_console()
     application = Application()
     application.main()
 

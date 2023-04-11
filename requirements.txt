@@ -1,11 +1,5 @@
-# readline for windows
-pyreadline3; sys_platform == 'win32'
-# readline for linux
-gnureadline; sys_platform == 'linux'
-
-# color support
-termcolor
-colorama; sys_platform == 'win32'
+# Allows color output, command history and auto complete
+prompt_toolkit
 
 # renaming of processes and threads via syscalls
 # renaming in python alone doesn't update process table

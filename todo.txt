@@ -1,16 +1,11 @@
 Do:
+- Better color scheme
+    - hexdump
+    - notification
+
 - Naming stype eSocketRole and members
 
 - More typing, such as typing.Final
-
-- Replace readline/pyreadline3 with python-prompt-toolkit
-    https://github.com/prompt-toolkit/python-prompt-toolkit
-    - replace completion
-        see fix: autocomplete not working in windows
-        https://python-prompt-toolkit.readthedocs.io/en/stable/pages/asking_for_input.html#autocompletion
-    - Make layouts to separate output from prompt https://python-prompt-toolkit.readthedocs.io/en/stable/pages/full_screen_apps.html
-    - replace colorama with https://python-prompt-toolkit.readthedocs.io/en/stable/pages/printing_text.html#ansi
-    - eventually replace termcolor (hexdump and base_parser)
 
 - Test every command
     - core and passthrough
@@ -36,11 +31,8 @@ Do:
 Fix:
 - pack/unpack c_string and pascal_string not working right
 - file completion not working with filenames with spaces
-- strange behavior when cursor not at end of line when packets are handled
-    - moving cursor causes issues
-    - getting output puts that output in the middle of the input line
-- Autocomplete not working in windows.
-
+- Instant historyid -> history line doesn't work
+- only print 'use quit or exit' on ctrl+c when buffer empty
 
 Ideas:
 - Allow "proxies" with connection to remote or listening sockets only to have the proxy act as the server/client, ie. a more fancy netcat

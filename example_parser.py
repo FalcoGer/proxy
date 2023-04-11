@@ -25,6 +25,9 @@ import typing
 
 from enum import Enum, auto
 
+from prompt_toolkit import print_formatted_text as print
+from prompt_toolkit.formatted_text import HTML, to_formatted_text
+
 # struct is used to decode bytes into primitive data types
 # https://docs.python.org/3/library/struct.html
 import struct
@@ -45,7 +48,7 @@ from eSocketRole import ESocketRole
 if typing.TYPE_CHECKING:
     from proxy import Proxy
     from application import Application
-    from readline_buffer_status import ReadlineBufferStatus as RBS
+    from buffer_status import BufferStatus
     from core_parser import CommandDictType
 
 # For more examples of commands, completers and api calls check core and base parser file.
@@ -136,7 +139,7 @@ class Parser(base_parser.Parser):
         ret = super()._buildCommandDict()
         
         # Add your custom commands here
-        ret['example']      = (self._cmd_example, 'Sends the string in the example setting count times to the client.\nUsage: {0} [upper | lower | as_is] <count>\nExample {0} as_is 10.', [self._exampleCompleter, self._historyCompleter, None])
+        ret['example']      = (self._cmd_example, 'Sends the string in the example setting count times to the client.\nUsage: {0} [upper | lower | as_is] <count>\nExample {0} as_is 10.', [self._exampleCompleter, None, None])
         # Alises
         ret['ex']           = ret['example']
         return ret
@@ -184,10 +187,10 @@ class Parser(base_parser.Parser):
     # Append any options you want to be in the auto completion list to completer.candidates
     # See core_parser.py for examples
 
-    def _exampleCompleter(self, rbs: RBS) -> typing.NoReturn:
+    def _exampleCompleter(self, bufferStatus: BufferStatus) -> typing.NoReturn:
         options = ['upper', 'lower', 'as_is']
         for option in options:
-            if option.startswith(rbs.being_completed):
+            if option.startswith(bufferStatus.being_completed):
                 self.completer.candidates.append(option)
         return
 

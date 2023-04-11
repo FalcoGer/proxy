@@ -3,12 +3,16 @@ import typing
 
 import traceback
 
+import prompt_toolkit as pt
+from prompt_toolkit.completion import Completer, Completion
+from buffer_status import BufferStatus
+
 if typing.TYPE_CHECKING:
     from application import Application
     from core_parser import Parser, CommandDictType
-    from readline_buffer_status import ReadlineBufferStatus as RBS
+    from prompt_toolkit.document import Document
 
-class Completer():
+class CustomCompleter(Completer):
     def __init__(self, application: Application, parser: Parser):
         self.application = application
         self.parser = parser
@@ -17,76 +21,79 @@ class Completer():
         return
     
     # pylint: disable=unused-argument
-    def complete(self, text: str, state: int) -> str:
-        response = None
+    def get_completions(self, document: Document, complete_event: pt.completion.base.CompleteEvent) -> Completion:
         try:
-            # First tab press for this string (state is 0), build the list of candidates.
-            if state == 0:
-                # Get line buffer info
-                rbs = self.application.getReadlineBufferStatus()
+            cmdDict: CommandDictType = self.parser.commandDictionary
+            bufferStatus: BufferStatus = BufferStatus(document)
+            
+            self.candidates = []
 
-                self.candidates = []
+            with open('bufferStatus.log', 'at', encoding='utf-8') as file:
+                file.write(f'{bufferStatus}\n\n')
+
+            if bufferStatus.being_completed.startswith('!'):
+                # completing history substitution
+                self.getHistIdxCandidates(True, bufferStatus)
+            elif bufferStatus.being_completed.startswith('$'):
+                # completing variable
+                self.getVariableCandidates(True, bufferStatus)
+            elif bufferStatus.wordIdx == 0:
+                # Completing commands
+                for cmd in cmdDict:
+                    if cmd.startswith(bufferStatus.being_completed):
+                        self.candidates.append(cmd)
+            else:
+                # Completing command argument
+                if bufferStatus.words[0] not in cmdDict.keys():
+                    # Can't complete if command is invalid
+                    return None
                 
-                cmdDict: CommandDictType = self.parser.commandDictionary
+                # retrieve which completer functions are available
+                _, _, completerFunctionArray = cmdDict[bufferStatus.words[0]]
 
-                if rbs.being_completed.startswith('!'):
-                    # completing history substitution
-                    self.getHistIdxCandidates(True, rbs)
-                elif rbs.being_completed.startswith('$'):
-                    # completing variable
-                    self.getVariableCandidates(True, rbs)
-                elif rbs.wordIdx == 0:
-                    # Completing commands
-                    for cmd in cmdDict:
-                        if cmd.startswith(rbs.being_completed):
-                            self.candidates.append(cmd)
+                if completerFunctionArray is None or len(completerFunctionArray) == 0:
+                    # Can't complete if there is no completer function defined
+                    # For example for commands without arguments
+                    return None
+                
+                if bufferStatus.wordIdx - 1 < len(completerFunctionArray):
+                    # Use the completer function with the index of the current word.
+                    # -1 for the command itself.
+                    completerFunction = completerFunctionArray[bufferStatus.wordIdx - 1]
                 else:
-                    # Completing command argument
-                    if rbs.words[0] not in cmdDict.keys():
-                        # Can't complete if command is invalid
-                        return None
-                    
-                    # retrieve which completer functions are available
-                    _, _, completerFunctionArray = cmdDict[rbs.words[0]]
+                    # Last completer will be used if currently completed word index is higher than
+                    # the amount of completer functions defined for that command
+                    completerFunction = completerFunctionArray[-1]
 
-                    if completerFunctionArray is None or len(completerFunctionArray) == 0:
-                        # Can't complete if there is no completer function defined
-                        # For example for commands without arguments
-                        return None
-                    
-                    if rbs.wordIdx - 1 < len(completerFunctionArray):
-                        # Use the completer function with the index of the current word.
-                        # -1 for the command itself.
-                        completerFunction = completerFunctionArray[rbs.wordIdx - 1]
-                    else:
-                        # Last completer will be used if currently completed word index is higher than
-                        # the amount of completer functions defined for that command
-                        completerFunction = completerFunctionArray[-1]
-
-                    # Don't complete anything if there is no such function defined.
-                    if completerFunction is None:
-                        return None
-                    
-                    # Get candidates.
-                    completerFunction(rbs)
+                # Don't complete anything if there is no such function defined.
+                if completerFunction is None:
+                    return None
+                
+                # Get candidates.
+                completerFunction(bufferStatus)
 
             # Return the answer!
             try:
-                response = self.candidates[state]
+                pos, _ = document.find_boundaries_of_current_word()
                 # expand the history completion to the full line
-                if len(self.candidates) == 1 and response is not None and len(response) > 0 and response[0] == '!':
-                    histIdx = int(response[1:])
-                    response = self.application.getHistoryItem(histIdx)
+                if len(self.candidates) == 1 and self.candidates[0] is not None and self.candidates[0][0] == '!':
+                    histIdx = int(self.candidates[0][1:])
+                    yield Completion(text=self.application.getHistoryItem(histIdx), start_position=pos)
+                    return Completion(text=f'!{histIdx}', start_position=pos)
+                else:
+                    for candidate in self.candidates:
+                        yield Completion(text=candidate, start_position=pos)
+                    return None
             except IndexError:
-                response = None
-        # pylint: disable=broad-except
+                return None
+            # pylint: disable=broad-except
         except Exception as e:
             print(e)
             print(traceback.format_exc())
         
-        return response
+        return None
     
-    def getHistIdxCandidates(self, includePrefix: bool, rbs: RBS) -> typing.NoReturn:
+    def getHistIdxCandidates(self, includePrefix: bool, bufferStatus: BufferStatus) -> typing.NoReturn:
         # Complete possible values only if there is not a complete match.
         # If there is a complete match, return that one only.
         # For example if completing '!3' but '!30' and '!31' are also available
@@ -95,21 +102,21 @@ class Completer():
         historyLines = self.application.getHistoryList()
         historyIndexes = list(idx for idx, _ in enumerate(historyLines))
 
-        if len(rbs.being_completed) > (1 if includePrefix else 0):
+        if len(bufferStatus.being_completed) > (1 if includePrefix else 0):
             historyIdx = -1
             try:
-                historyIdx = int(rbs.being_completed[(1 if includePrefix else 0):])
+                historyIdx = int(bufferStatus.being_completed[(1 if includePrefix else 0):])
             except ValueError:
                 pass
             
             # if there is a complete and valid (not None) match, return that match only.
             if historyIdx in historyIndexes \
                     and self.application.getHistoryItem(historyIdx) is not None \
-                    and str(historyIdx) == rbs.being_completed[(1 if includePrefix else 0):]:
+                    and str(historyIdx) == bufferStatus.being_completed[(1 if includePrefix else 0):]:
                 if includePrefix:
-                    self.candidates.append(rbs.being_completed)
+                    self.candidates.append(bufferStatus.being_completed)
                 else:
-                    self.candidates.append(rbs.being_completed[(1 if includePrefix else 0):])
+                    self.candidates.append(bufferStatus.being_completed[(1 if includePrefix else 0):])
                 return
 
         # If there has not been a complete match, look for other matches.
@@ -119,15 +126,15 @@ class Completer():
                 # Skip invalid options.
                 continue
 
-            if str(historyIdx).startswith(rbs.being_completed[(1 if includePrefix else 0):]):
+            if str(historyIdx).startswith(bufferStatus.being_completed[(1 if includePrefix else 0):]):
                 self.candidates.append(('!' if includePrefix else '') + str(historyIdx))
         return
     
-    def getVariableCandidates(self, includePrefix: bool, rbs: RBS) -> typing.NoReturn:
+    def getVariableCandidates(self, includePrefix: bool, bufferStatus: BufferStatus) -> typing.NoReturn:
         # TODO: allow for $(varname) format also
         # make sure that $(varname)$(varname) also works.
         for variableName in self.application.getVariableNames():
-            if (('$' if includePrefix else '') + variableName).startswith(rbs.being_completed):
+            if (('$' if includePrefix else '') + variableName).startswith(bufferStatus.being_completed):
                 self.candidates.append(('$' if includePrefix else '') + variableName)
         return
 

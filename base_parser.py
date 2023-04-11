@@ -12,11 +12,8 @@ import struct
 import os
 from enum import Enum, auto
 import time
-try:
-    import termcolor
-    _COLOR_AVAILABLE = True
-except ImportError:
-    _COLOR_AVAILABLE = False
+from prompt_toolkit import print_formatted_text as print
+from prompt_toolkit.formatted_text import HTML, to_formatted_text
 
 # This is the base class for the base parser
 import core_parser
@@ -29,7 +26,7 @@ if typing.TYPE_CHECKING:
     from proxy import Proxy
     from application import Application
     from core_parser import CommandDictType
-    from readline_buffer_status import ReadlineBufferStatus as RBS
+    from buffer_status import BufferStatus
 
 ###############################################################################
 # Define which settings are available here.
@@ -107,28 +104,37 @@ class Parser(core_parser.Parser):
             
             pktNrStr = f'[PKT# {pktNr}]'
 
-            directionStr = '[C -> S]' if origin == ESocketRole.client else '[C <- S]'
+            directionStr =  '[C -> S]' if origin == ESocketRole.client else '[C <- S]'
 
             dataLenStr = f'{len(data)} Byte{"s" if len(data) > 1 else ""}'
             
-            if _COLOR_AVAILABLE:
-                tsStr = termcolor.colored(tsStr, 'cyan')
-                proxyStr = termcolor.colored(proxyStr, 'green', None, ['bold'])
-                pktNrStr = termcolor.colored(pktNrStr, 'yellow', None)
-                if origin == ESocketRole.client:
-                    directionStr = termcolor.colored(directionStr, 'white', 'on_blue', ['bold'])
-                else:
-                    directionStr = termcolor.colored(directionStr, 'white', 'on_magenta')
-                dataLenStr = termcolor.colored(dataLenStr, 'green', None, ['bold'])
+            # Colorize output.
+            tsStr = self.application.escapeHTML(tsStr)
+            tsStr = f'<cyan>{tsStr}</cyan>'
 
-            # TimeStamp Proxy PktNr Direction DataLength
-            output.append(f'{tsStr} - {proxyStr} {pktNrStr} {directionStr} - {dataLenStr}')
+            proxyStr = self.application.escapeHTML(proxyStr)
+            proxyStr = f'<green><b>{proxyStr}</b></green>'
+            
+            pktNrstr = self.application.escapeHTML(pktNrStr)
+            pktNrStr = f'<yellow>{pktNrStr}</yellow>'
+            
+            directionStr = self.application.escapeHTML(directionStr)
+            if origin == ESocketRole.client:
+                directionStr = f'<style fg="white" bg="blue"><b>{directionStr}</b></style>'
+            else:
+                directionStr = f'<style fg="white" bg="magenta"><b>{directionStr}</b></style>'
+            
+            dataLenStr = self.application.escapeHTML(dataLenStr)
+            dataLenStr = f'<green><b>{dataLenStr}</b></green>'
+            
+            # Put it all together.
+            output.append(to_formatted_text(HTML(f'{tsStr} - {proxyStr} {pktNrStr} {directionStr} - {dataLenStr}')))
         
         # Output a hexdump if enabled.
         if self.getSetting(EBaseSettingKey.HEXDUMP_ENABLED):
             hexdumpObj = self.getSetting(EBaseSettingKey.HEXDUMP)
-            hexdumpLines = '\n'.join(hexdumpObj.hexdump(data))
-            output.append(f'{hexdumpLines}')
+            for line in hexdumpObj.hexdump(data):
+                output.append(line)
         
         # Return the output.
         return output
@@ -155,13 +161,13 @@ class Parser(core_parser.Parser):
         sendStringNote = 'Usage: {0} <String>\nExample: {0} hello\\!\\n\nNote: Leading spaces in the string are sent\nexcept for the space between the command and\nthe first character of the string.\nEscape sequences are available.'
         sendFileNote = 'Usage: {0} filename\nExample: {0} /home/user/.bashrc'
 
-        ret['hexdump']      = (self._cmd_hexdump, 'Configure the hexdump or show current configuration.\nUsage: {0} [yes|no] [<BytesPerLine>] [<BytesPerGroup>]', [self._yesNoCompleter, self._historyCompleter, self._historyCompleter, None])
+        ret['hexdump']      = (self._cmd_hexdump, 'Configure the hexdump or show current configuration.\nUsage: {0} [yes|no] [<BytesPerLine>] [<BytesPerGroup>]', [self._yesNoCompleter, None, None, None])
         ret['notify']       = (self._cmd_notify, 'Configure packet notifications.\nUsage: {0} [yes|no]\nIf argument omitted, this will toggle the notifications.', [self._yesNoCompleter, None])
-        ret['h2s']          = (self._cmd_h2s, f'Send arbitrary hex values to the server.\n{sendHexNote}', [self._historyCompleter])
-        ret['s2s']          = (self._cmd_s2s, f'Send arbitrary strings to the server.\n{sendStringNote}', [self._historyCompleter])
+        ret['h2s']          = (self._cmd_h2s, f'Send arbitrary hex values to the server.\n{sendHexNote}', None)
+        ret['s2s']          = (self._cmd_s2s, f'Send arbitrary strings to the server.\n{sendStringNote}', None)
         ret['f2s']          = (self._cmd_f2s, f'Send arbitrary files to the server.\n{sendFileNote}', [self._fileCompleter, None])
-        ret['h2c']          = (self._cmd_h2c, f'Send arbitrary hex values to the client.\n{sendHexNote}', [self._historyCompleter])
-        ret['s2c']          = (self._cmd_s2c, f'Send arbitrary strings to the client.\n{sendStringNote}', [self._historyCompleter])
+        ret['h2c']          = (self._cmd_h2c, f'Send arbitrary hex values to the client.\n{sendHexNote}', None)
+        ret['s2c']          = (self._cmd_s2c, f'Send arbitrary strings to the client.\n{sendStringNote}', None)
         ret['f2c']          = (self._cmd_f2c, f'Send arbitrary files to the client.\n{sendFileNote}', [self._fileCompleter, None])
 
         return ret
@@ -306,9 +312,9 @@ class Parser(core_parser.Parser):
     ###############################################################################
     # Completers go here.
 
-    def _yesNoCompleter(self, rbs: RBS) -> typing.NoReturn:
+    def _yesNoCompleter(self, bufferStatus: BufferStatus) -> typing.NoReturn:
         options = ['yes', 'no']
         for option in options:
-            if option.startswith(rbs.being_completed):
+            if option.startswith(bufferStatus.being_completed):
                 self.completer.candidates.append(option)
         return

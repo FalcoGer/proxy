@@ -3,118 +3,76 @@ from __future__ import annotations
 from enum import Enum, auto
 import typing
 
-_COLOR_AVAILABLE = False
-
-try:
-    import termcolor
-    _COLOR_AVAILABLE = True
-except ImportError:
-    pass
+from prompt_toolkit.formatted_text import HTML, to_formatted_text
 
 class ERepresentation(Enum):
     HEX = auto()
     PRINTABLE = auto()
 
-if typing.TYPE_CHECKING:
-    AttrType = typing.Union[None, list[str], tuple[list[str]], tuple[list[str], list[str]]]
-
 class ColorSetting:
-    def __init__(self, fg: str = None, bg: str = None, hexAttributes: AttrType = None, printableAttributes: AttrType = None):
-        self.setFg(fg)
-        self.setBg(bg)
-        self.setHexAttributes(hexAttributes)
-        self.setPrintableAttributes(printableAttributes)
+    def __init__(self, hexTagsOdd: str = None, hexTagsEven: str = None, printableTagsOdd: str = None, printableTagsEven: str = None):
+        if hexTagsOdd is None:
+            hexTagsOdd = ''
+        self._hexTagsOdd = (hexTagsOdd, self._getClosingTags(hexTagsOdd))
         
-        if self.printableAttributes is None:
-            self.setPrintableAttributes(self.hexAttributes)
+        if hexTagsEven is None:
+            hexTagsEven = hexTagsOdd
+        self._hexTagsEven = (hexTagsEven, self._getClosingTags(hexTagsEven))
+        
+        if printableTagsOdd is None:
+            printableTagsOdd = hexTagsOdd
+        self._printableTagsOdd = (printableTagsOdd, self._getClosingTags(printableTagsOdd))
+        
+        if printableTagsEven is None:
+            printableTagsEven = hexTagsEven
+        self._printableTagsEven = (printableTagsEven, self._getClosingTags(printableTagsEven))
+        
+        self._hexAttributes = (self._hexTagsOdd, self._hexTagsEven)
+        self._printableAttributes = (self._printableTagsOdd, self._printableTagsEven)
         return
 
-    def setHexAttributes(self, hexAttributes: AttrType) -> typing.NoReturn:
-        self.hexAttributes = self.checkAttributes(hexAttributes)
-        return
+    def _getClosingTags(self, tags: str) -> str:
+        if not tags:
+            return ''
+        closingTags = []
+        tagStart = 0
+        tagEnd = -1
+        for idx, c in enumerate(tags):
+            if c == '<':
+                tagStart = idx + 1
+            if c == '>':
+                tagEnd = idx 
+            if tagStart <= tagEnd:
+                tagContent = tags[tagStart:tagEnd]
+                tagStart = 0
+                tagEnd = -1
+                tag = tagContent.split()[0]
+                closingTags.insert(0,f'</{tag}>')
+        return ''.join(closingTags)
     
-    def setPrintableAttributes(self, printableAttributes: AttrType) -> typing.NoReturn:
-        self.printableAttributes = self.checkAttributes(printableAttributes)
-        return
-
-    def setFg(self, fg: str) -> typing.NoReturn:
-        if fg is None:
-            self.fg = None
-            return
-
-        if fg not in termcolor.COLORS:
-            raise KeyError(f'Foreground color was {repr(fg)} but must be one of {list(termcolor.COLORS.keys())}')
-        self.fg = fg
-        return
-
-    def setBg(self, bg: str) -> typing.NoReturn:
-        if bg is None:
-            self.bg = None
-            return
-
-        if bg not in termcolor.HIGHLIGHTS:
-            raise KeyError(f'Background color was {repr(bg)} but must be one of {list(termcolor.HIGHLIGHTS.keys())}')
-        self.bg = bg
-        return
-    
-    def checkAttributes(self, attributes: AttrType):
-        if attributes is None:
-            return None
-        
-        if not isinstance(attributes, tuple) and not isinstance(attributes, list):
-            raise TypeError('Attribute {repr(attributes)} must be None or list[str], or tuple[list[str], list[str]] but was {type(attributes)}.')
-        
-        # if only a list was given, make it a tuple
-        if isinstance(attributes, list):
-            attributes = (attributes,)
-
-        if len(attributes) > 2:
-            raise TypeError('Attributes {repr(attributes)} was tuple, but it needs to be of length 1 or 2.')
-
-        oddAttributes = attributes[0]
-        if oddAttributes is None:
-            oddAttributes = []
-
-        if len(attributes) == 1: # tuple of length 1
-            evenAttributes = oddAttributes
-        else:
-            evenAttributes = attributes[1]
-
-        if evenAttributes is None:
-            evenAttributes = []
-        
-        # check validity of attributes
-        for attributeString in (evenAttributes + oddAttributes):
-            if attributeString not in termcolor.ATTRIBUTES:
-                raise KeyError('Found attribute {repr(attributeString)} which is not in {list(termcolor.ATTRIBUTES.keys())}')
-
-        return (oddAttributes, evenAttributes)
-
     def __str__(self):
-        return f'ColorSetting: {self.fg=}, {self.bg=}, {self.hexAttributes=}, {self.printableAttributes=}'
+        return f'ColorSetting: {self._hexAttributes=}, {self._printableAttributes=}'
 
     def colorize(self, dataStr: str, isEven: bool = False, representation: ERepresentation = ERepresentation.HEX) -> str:
-        if not _COLOR_AVAILABLE:
-            return dataStr
-
         attr = None
         if representation == ERepresentation.HEX:
-            if self.hexAttributes is not None:
-                if isEven and len(self.hexAttributes) == 2:
-                    attr = self.hexAttributes[1]
+            if self._hexAttributes is not None:
+                if isEven and len(self._hexAttributes) == 2:
+                    attr = self._hexAttributes[1]
                 else:
                     # odd or not enough attributes in the tuple (only gave the odd one)
-                    attr = self.hexAttributes[0]
+                    attr = self._hexAttributes[0]
         else:
-            if self.printableAttributes is not None:
-                if isEven and len(self.printableAttributes) == 2:
-                    attr = self.printableAttributes[1]
+            if self._printableAttributes is not None:
+                if isEven and len(self._printableAttributes) == 2:
+                    attr = self._printableAttributes[1]
                 else:
                     # odd or not enough attributes in the tuple (only gave the odd one)
-                    attr = self.printableAttributes[0]
+                    attr = self._printableAttributes[0]
         
         try:
-            return termcolor.colored(dataStr, self.fg, self.bg, attr)
+            dataStr = dataStr.replace('&', '&amp;').replace('<', '&lt;').replace('>','&gt;')
+            return f'{attr[0]}{dataStr}{attr[1]}'
         except Exception as e:
             print(f'Unable to color {repr(dataStr)} with {self}: {e}')
             return dataStr
@@ -171,28 +129,26 @@ class Hexdump():
         # Special case is the backslash since it's representation string is "'\\\\'" (len 6)
         self.REPRESENTATION_ARRAY = ''.join([(len(repr(chr(b))) == 3 or repr(chr(b)) == '\'\\\\\'') and chr(b) or self.sep for b in range(256)])
 
-        if not _COLOR_AVAILABLE:
-            self.colorSettings = None
-        else:
-            self.colorSettings: dict[(typing.Union[EColorSettingKey, int], ColorSetting)] = {}
+        self.colorSettings: dict[(typing.Union[EColorSettingKey, int], ColorSetting)] = {}
         
         if defaultColors and self.colorSettings is not None:
+            # FIXME: Colors
             # color available but not set
             # Formatting
-            self.colorSettings[EColorSettingKey.ADDRESS]                = ColorSetting('yellow', None, ['bold'])
+            self.colorSettings[EColorSettingKey.ADDRESS]                = ColorSetting('<yellow><b>')
             self.colorSettings[EColorSettingKey.SPACER_MAJOR]           = ColorSetting()
             self.colorSettings[EColorSettingKey.SPACER_MINOR]           = ColorSetting()
-            self.colorSettings[EColorSettingKey.BYTE_TOTAL]             = ColorSetting(None, None, ['bold', 'underline'])
+            self.colorSettings[EColorSettingKey.BYTE_TOTAL]             = ColorSetting('<b><u>')
             # Data
-            self.colorSettings[EColorSettingKey.CONTROL]                = ColorSetting('magenta', None, ([], ['dark']))
-            self.colorSettings[EColorSettingKey.DIGITS]                 = ColorSetting('blue', None, ([], ['dark']))
-            self.colorSettings[EColorSettingKey.LETTERS]                = ColorSetting('green', None, ([], ['dark']))
-            self.colorSettings[EColorSettingKey.PRINTABLE]              = ColorSetting('cyan', None, ([], ['dark']))
-            self.colorSettings[EColorSettingKey.PRINTABLE_HIGH_ASCII]   = ColorSetting('yellow', None, ([], ['dark']))
-            self.colorSettings[EColorSettingKey.NON_PRINTABLE]          = ColorSetting('red', None, ([], ['dark']))
-            self.colorSettings[ord(' ')]                                = ColorSetting('green', None, ([], ['dark']), (['underline']))
-            self.colorSettings[ord('_')]                                = ColorSetting('cyan', None, ([], ['dark']), (['underline', 'bold'], ['underline', 'dark', 'bold']))
-            self.colorSettings[0x00]                                    = ColorSetting('white', None, ([], ['dark']), (['bold'], ['bold', 'dark']))
+            self.colorSettings[EColorSettingKey.CONTROL]                = ColorSetting('<violet>', '<magenta>')
+            self.colorSettings[EColorSettingKey.DIGITS]                 = ColorSetting('<turquoise>', '<teal>')
+            self.colorSettings[EColorSettingKey.LETTERS]                = ColorSetting('<lime>','<green>')
+            self.colorSettings[EColorSettingKey.PRINTABLE]              = ColorSetting('<cyan>','<darkcyan>')
+            self.colorSettings[EColorSettingKey.PRINTABLE_HIGH_ASCII]   = ColorSetting('<yellow>','<orange>')
+            self.colorSettings[EColorSettingKey.NON_PRINTABLE]          = ColorSetting('<red>','<darkred>')
+            self.colorSettings[ord(' ')]                                = ColorSetting('<lime>','<green>','<lime><u>','<green><u>')
+            self.colorSettings[ord('_')]                                = ColorSetting('<cyan>','<darkcyan>','<cyan><u><b>','<darkcyan><u><b>')
+            self.colorSettings[0x00]                                    = ColorSetting('<white><b>','<lightgray><b>')
         return
 
     def __str__(self):
@@ -262,8 +218,8 @@ class Hexdump():
         for addr in range(0, len(src), self.bytesPerLine):
             # The chars we need to process for this line
             byteArray = src[addr : addr + self.bytesPerLine]
-            lines.append(self.constructLine(addr, maxAddrLen, byteArray))
-        lines.append(self.constructByteTotal(len(src), maxAddrLen))
+            lines.append(to_formatted_text(HTML(self.constructLine(addr, maxAddrLen, byteArray))))
+        lines.append(to_formatted_text(HTML(self.constructByteTotal(len(src), maxAddrLen))))
         return lines
 
     def constructLine(self, address: int, maxAddrLen: int, byteArray: bytes) -> str:

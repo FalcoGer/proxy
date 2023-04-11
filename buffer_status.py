@@ -2,24 +2,23 @@ from __future__ import annotations
 import typing
 
 if typing.TYPE_CHECKING:
-    from types import ModuleType
+    from prompt_toolkit.document import Document
 
 
-class ReadlineBufferStatus():
-    def __init__(self, readlineModule: ModuleType):
-        self._readlineModule = readlineModule
-        self.update()
-        return
+class BufferStatus():
+    def __init__(self, doc: Document):
+        self._doc = doc
 
-    def update(self) -> typing.NoReturn:
         # This containes the whole line in the line buffer
-        self.origline           = self._readlineModule.get_line_buffer()
-
+        self.origline           = self._doc.current_line
+        
+        self.cursorPos          = self._doc.cursor_position
         # This is the index of the first character in the line buffer that is considered for completion
-        self.begin              = self._readlineModule.get_begidx()
-
         # This is the index of the last character in the line buffer that is considered for completion
-        self.end                = self._readlineModule.get_endidx()
+        self.begin, self.end    = self._doc.find_boundaries_of_current_word()
+        self.begin += self.cursorPos
+        self.end += self.cursorPos
+
         # For example 'wordone wordtwo wordth[tab] more words here'
         #                              ^ begin
         #                                   ^ end
@@ -31,6 +30,12 @@ class ReadlineBufferStatus():
         # The word index in the line, in the example it's 3.
         self.wordIdx            = self._getWordIdx()
         return
+
+    def __str__(self) -> str:
+        return f'{self.origline=}\n{self.begin=}\n{self.end=}\n{self.being_completed=}\n{self.wordIdx=}'
+
+    def getDocument(self) -> Document:
+        return self._doc
 
     def _getWordIdx(self) -> int:
         # Which word are we currently completing

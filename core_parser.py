@@ -13,21 +13,22 @@ import struct
 import os
 from enum import Enum, auto
 from copy import copy
+from prompt_toolkit import print_formatted_text as print
 
 from eSocketRole import ESocketRole
-from completer import Completer
+from completer import CustomCompleter
 
 # For type hints only
 if typing.TYPE_CHECKING:
     from proxy import Proxy
     from application import Application
-    from readline_buffer_status import ReadlineBufferStatus as RBS
+    from buffer_status import BufferStatus
     CommandDictType = dict[
             str, # Key (command name)
             typing.Tuple[ # Value
                 typing.Callable[[list[str], Proxy], typing.Union[str, int]], # Command callback
                 str, # Help text
-                typing.Iterable[typing.Callable[[RBS], typing.NoReturn]] # Completer functions
+                typing.Iterable[typing.Callable[[BufferStatus], typing.NoReturn]] # Completer functions
             ]
         ]
 
@@ -62,7 +63,7 @@ class Parser():
 
     def __init__(self, application: Application, settings: dict[(Enum, typing.Any)]):
         self.application = application
-        self.completer = Completer(application, self)
+        self.completer = CustomCompleter(application, self)
         self.commandDictionary: CommandDictType = self._buildCommandDict()
 
         # Populate settings
@@ -121,25 +122,25 @@ class Parser():
         ret['quit']         = (self._cmd_quit, 'Stop the proxy and quit.\nUsage: {0}', None)
         ret['select']       = (self._cmd_select, f'Select a different proxy to give commands to.\nUsage: {{0}} <Proxy>\n{proxySelectionNote}', [self._proxyNameCompleter, None])
         ret['deselect']     = (self._cmd_deselect, 'Deselect the currently selected proxy.\nUsage: {0}', None)
-        ret['new']          = (self._cmd_new, 'Create a new proxy.\nUsage: {0} <LocalPort> <RemotePort> <host> [<ProxyName>] [<ParserModule>]', [self._historyCompleter, self._historyCompleter, self._historyCompleter, self._historyCompleter, self._parserNameCompleter, None])
+        ret['new']          = (self._cmd_new, 'Create a new proxy.\nUsage: {0} <LocalPort> <RemotePort> <host> [<ProxyName>] [<ParserModule>]', [None, None, None, None, self._parserNameCompleter, None])
         ret['kill']         = (self._cmd_kill, f'Stop a proxy.\nUsage: {{0}} [<Proxy>]\nIf Proxy is omitted, this kills the currently selected proxy.\n{proxySelectionNote}', [self._proxyNameCompleter])
-        ret['rename']       = (self._cmd_rename, f'Rename a proxy.\nUsage: {{0}} [<Proxy>] <NewName>\nIf Proxy is omitted, this renames the currently selected proxy.\n{proxySelectionNote}', [self._proxyNameCompleter, self._historyCompleter, None])
+        ret['rename']       = (self._cmd_rename, f'Rename a proxy.\nUsage: {{0}} [<Proxy>] <NewName>\nIf Proxy is omitted, this renames the currently selected proxy.\n{proxySelectionNote}', [self._proxyNameCompleter, None, None])
         ret['disconnect']   = (self._cmd_disconnect, f'Disconnect from the client and server.\nUsage: {{0}} [<Proxy>]\n{proxySelectionNote}', [self._proxyNameCompleter, None])
         ret['loadparser']   = (self._cmd_loadparser, f'Load a custom parser for proxy.\nUsage: {{0}} [<Proxy>] <ParserName>\nExample: {{0}} PROXY_8080 example_parser\nIf Proxy is omitted, this changes the parser of the currently selected proxy.\n{proxySelectionNote}', [self._proxyNameCompleter, self._parserNameCompleter, None])
         ret['lsproxy']      = (self._cmd_lsproxy, 'Display all configured proxies and their status.\nUsage: {0}', None)
-        ret['run']          = (self._cmd_run, 'Runs a script file.\nUsage: {0} <FilePath> [<LineNumber>]\nIf line number is given, the script will start execution on that line.\nLines starting with "#" will be ignored.', [self._fileCompleter, self._historyCompleter, None])
+        ret['run']          = (self._cmd_run, 'Runs a script file.\nUsage: {0} <FilePath> [<LineNumber>]\nIf line number is given, the script will start execution on that line.\nLines starting with "#" will be ignored.', [self._fileCompleter, None, None])
         ret['clearhistory'] = (self._cmd_clearhistory, 'Clear the command history or delete one entry of it.\nUsage: {0} [<HistoryIndex>].\nNote: The history file will written only on exit.', None)
         ret['lshistory']    = (self._cmd_lshistory, 'Show the command history or display one entry of it.\nUsage: {0} [<HistoryIndex>]', None)
         ret['lssetting']    = (self._cmd_lssetting, 'Show the current settings or display a specific setting.\nUsage: {0} [<SettingName>]', [self._settingsCompleter, None])
-        ret['set']          = (self._cmd_set, 'Sets variable to a value\nUsage: {0} <VariableName> <Value>\nExample: {0} httpGet GET / HTTP/1.0\\n', [self._variableCompleter, self._historyCompleter])
+        ret['set']          = (self._cmd_set, 'Sets variable to a value\nUsage: {0} <VariableName> <Value>\nExample: {0} httpGet GET / HTTP/1.0\\n', [self._variableCompleter, None])
         ret['unset']        = (self._cmd_unset, 'Deletes a variable.\nUsage: {0} <VariableName>\nExample: {0} httpGet', [self._variableCompleter, None])
         ret['lsvars']       = (self._cmd_lsvars, 'Lists variables.\nUsage: {0} [<VariableName>]\nExample: {0}\nExample: {0} httpGet', [self._variableCompleter, None])
         ret['savevars']     = (self._cmd_savevars, 'Saves variables to a file.\nUsage: {0} <FilePath>', [self._fileCompleter, None])
         ret['loadvars']     = (self._cmd_loadvars, 'Loads variables from a file\nUsage: {0} <FilePath>\nNote: Existing variables will be retained.', [self._fileCompleter, None])
         ret['clearvars']    = (self._cmd_clearvars, 'Clears variables.\nUsage: {0}', None)
-        ret['pack']         = (self._cmd_pack, 'Packs data into a different format.\nUsage: {0} <DataType> <Format> <Data> [<Data> ...]\nNote: Data is separated by spaces.\nExample: {0} int little_endian 255 0377 0xFF\nExample: {0} byte little_endian 41 42 43 44\nExample: {0} uchar little_endian x41 x42 x43 x44\nRef: https://docs.python.org/3/library/struct.html\nNote: Use auto-complete.', [self._packDataTypeCompleter, self._packFormatCompleter, self._historyCompleter])
-        ret['unpack']       = (self._cmd_unpack, 'Unpacks and displays data from a different format.\nUsage: {0} <DataType> <Format> <HexData>\nNote: Hex data may contain spaces, they are ignored.\nExample: {0} int little_endian 01000000 02000000\nExample: {0} c_string native 41424344\nRef: https://docs.python.org/3/library/struct.html\nNote: Use auto-complete.', [self._packDataTypeCompleter, self._packFormatCompleter, self._historyCompleter])
-        ret['convert']      = (self._cmd_convert, 'Converts numbers from one type to all others.\nUsage: {0} [<SourceFormat>] <Number>\nExample: {0} dec 65\nExample: {0} 0x41\nNote: If source format is not specified, it will be derrived from the format of the number itself.', [self._convertTypeCompleter, self._historyCompleter, None])
+        ret['pack']         = (self._cmd_pack, 'Packs data into a different format.\nUsage: {0} <DataType> <Format> <Data> [<Data> ...]\nNote: Data is separated by spaces.\nExample: {0} int little_endian 255 0377 0xFF\nExample: {0} byte little_endian 41 42 43 44\nExample: {0} uchar little_endian x41 x42 x43 x44\nRef: https://docs.python.org/3/library/struct.html\nNote: Use auto-complete.', [self._packDataTypeCompleter, self._packFormatCompleter, None])
+        ret['unpack']       = (self._cmd_unpack, 'Unpacks and displays data from a different format.\nUsage: {0} <DataType> <Format> <HexData>\nNote: Hex data may contain spaces, they are ignored.\nExample: {0} int little_endian 01000000 02000000\nExample: {0} c_string native 41424344\nRef: https://docs.python.org/3/library/struct.html\nNote: Use auto-complete.', [self._packDataTypeCompleter, self._packFormatCompleter, None])
+        ret['convert']      = (self._cmd_convert, 'Converts numbers from one type to all others.\nUsage: {0} [<SourceFormat>] <Number>\nExample: {0} dec 65\nExample: {0} 0x41\nNote: If source format is not specified, it will be derrived from the format of the number itself.', [self._convertTypeCompleter, None, None])
 
         # Aliases
         ret['exit']         = ret['quit']
@@ -179,11 +180,11 @@ class Parser():
             print(f'{cmdname.ljust(maxLen)}', end=('' if (idx + 1) % maxCmdsPerLine != 0 else '\n'))
         
         print('\n\nUse "help <cmdName>" to find out more about how to use a command.')
-
         # Print general CLI help also
-        print('Readline extensions are available.')
+        print('Prompt toolkit extensions are available.')
         print('  Use TAB for auto completion')
         print('  Use CTRL+R for history search.')
+        print('More CLI features are available:')
         print('  Use !idx to execute a command from the history again.')
         print('  Use $varname to expand variables.')
         print('  To use a literal ! or $ use \\! and \\$ respectively.')
@@ -369,7 +370,7 @@ class Parser():
                     print(self.getHelpText(args[0]))
                     raise ValueError('Line number can not be <=0 but was {lineNr}.')
             except ValueError as e:
-                return 'Syntax error: {e}'
+                return f'Syntax error: {e}'
         if not os.path.exists(filePath):
             return f'Could not locate {repr(firstTryPath)} or {repr(filePath)}.'
         
@@ -793,27 +794,27 @@ class Parser():
     ###############################################################################
     # Completers go here.
 
-    def _convertTypeCompleter(self, rbs: RBS) -> typing.NoReturn:
+    def _convertTypeCompleter(self, bufferStatus: BufferStatus) -> typing.NoReturn:
         options = ['dec', 'bin', 'oct', 'hex']
         for option in options:
-            if option.startswith(rbs.being_completed):
+            if option.startswith(bufferStatus.being_completed):
                 self.completer.candidates.append(option)
         return
 
-    def _packDataTypeCompleter(self, rbs: RBS) -> typing.NoReturn:
+    def _packDataTypeCompleter(self, bufferStatus: BufferStatus) -> typing.NoReturn:
         options = self._aux_pack_getDataTypeMapping().keys()
         for option in options:
-            if option.startswith(rbs.being_completed):
+            if option.startswith(bufferStatus.being_completed):
                 self.completer.candidates.append(option)
         return
 
-    def _packFormatCompleter(self, rbs: RBS) -> typing.NoReturn:
+    def _packFormatCompleter(self, bufferStatus: BufferStatus) -> typing.NoReturn:
         formatMapping = self._aux_pack_getFormatMapping()
         dataTypeMapping = self._aux_pack_getDataTypeMapping()
         # 'n' and 'N' only available in native.
         nativeOnlyList = list(filter(lambda x: dataTypeMapping[x] in ['n', 'N'], dataTypeMapping.keys()))
         
-        if rbs.words[1] in nativeOnlyList:
+        if bufferStatus.words[1] in nativeOnlyList:
             self.completer.candidates.append('native')
             # '@' also valid, but omit for quicker typing.
             # self.completer.candidates.append('@')
@@ -822,20 +823,20 @@ class Parser():
         # Return all available options
         options = formatMapping.keys()
         for option in options:
-            if option.startswith(rbs.being_completed):
+            if option.startswith(bufferStatus.being_completed):
                 self.completer.candidates.append(option)
         return
 
-    def _commandCompleter(self, rbs: RBS) -> typing.NoReturn:
+    def _commandCompleter(self, bufferStatus: BufferStatus) -> typing.NoReturn:
         self.completer.candidates.extend( [
                 s
                 for s in self.commandDictionary
-                if s and s.startswith(rbs.being_completed)
+                if s and s.startswith(bufferStatus.being_completed)
             ]
         )
         return
 
-    def _fileCompleter(self, rbs: RBS) -> typing.NoReturn:
+    def _fileCompleter(self, bufferStatus: BufferStatus) -> typing.NoReturn:
         # FIXME: fix completion for paths with spaces
 
         # Append candidates for files
@@ -845,7 +846,7 @@ class Parser():
         # Find which directory we are in
         directory = os.curdir + '/'
         filenameStart = ''
-        word = rbs.words[rbs.wordIdx]
+        word = bufferStatus.words[bufferStatus.wordIdx]
         if word:
             # There is at least some text being completed.
             if word.find('/') >= 0:
@@ -867,52 +868,38 @@ class Parser():
                     self.completer.candidates.append(file)
         return
 
-    def _settingsCompleter(self, rbs: RBS) -> typing.NoReturn:
+    def _settingsCompleter(self, bufferStatus: BufferStatus) -> typing.NoReturn:
         for settingName in [x.name for x in self.getSettingKeys()]:
-            if settingName.startswith(rbs.being_completed):
+            if settingName.startswith(bufferStatus.being_completed):
                 self.completer.candidates.append(settingName)
         return
 
-    def _variableCompleter(self, rbs: RBS) -> typing.NoReturn:
-        self.completer.getVariableCandidates(False, rbs)
+    def _variableCompleter(self, bufferStatus: BufferStatus) -> typing.NoReturn:
+        self.completer.getVariableCandidates(False, bufferStatus)
         return
 
-    def _historyCompleter(self, rbs: RBS) -> typing.NoReturn:
-        # Get candidates from the history
-        history = self.application.getHistoryList()
-        for historyline in history:
-            if historyline is None or len(historyline) == 0:
-                continue
-            
-            # Get the whole line.
-            if historyline.startswith(rbs.origline):
-                # Must only append to the part that is currently being completed
-                # otherwise the whole line may be added again.
-                self.completer.candidates.append(historyline[rbs.begin:])            
-        return
-
-    def _proxyNameCompleter(self, rbs: RBS) -> typing.NoReturn:
+    def _proxyNameCompleter(self, bufferStatus: BufferStatus) -> typing.NoReturn:
         # Find listening port numbers only if we started with a number.
-        if len(rbs.being_completed) > 0 and ord(rbs.being_completed[0]) in range(ord('0'), ord('9') + 1):
+        if len(bufferStatus.being_completed) > 0 and ord(bufferStatus.being_completed[0]) in range(ord('0'), ord('9') + 1):
             for proxy in self.application.getProxyList():
                 _, lp = proxy.getBind()
-                if str(lp).startswith(rbs.being_completed):
+                if str(lp).startswith(bufferStatus.being_completed):
                     self.completer.candidates.append(str(lp))
             return
         
         # Find Names otherwise. (Names can't start with a number)
         for proxy in self.application.getProxyList():
-            if proxy.name.startswith(rbs.being_completed):
+            if proxy.name.startswith(bufferStatus.being_completed):
                 self.completer.candidates.append(proxy.name)
         return
 
-    def _parserNameCompleter(self, rbs: RBS) -> typing.NoReturn:
+    def _parserNameCompleter(self, bufferStatus: BufferStatus) -> typing.NoReturn:
         FILE_SIZE_LIMIT_FOR_CHECK = 50 * (2 ** 10) # 50 KiB
         # find all files in directory
         for fileName in os.listdir(os.curdir):
             isCandidate = False
             try:
-                if not fileName.startswith(rbs.being_completed):
+                if not fileName.startswith(bufferStatus.being_completed):
                     # Skip filenames that don't match.
                     continue
 

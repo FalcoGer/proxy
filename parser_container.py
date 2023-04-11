@@ -23,12 +23,12 @@ class ParserContainer():
         return self.dynamicLoader.moduleName
 
     def setSettings(self, settings: dict[Enum, typing.Any]) -> typing.NoReturn:
-        completerFunction = self.application.getCompleterFunction()
-        needToSetCompleter = completerFunction == self.instance.completer.complete
+        completer = self.application.getCompleter()
+        needToSetCompleter = completer == self.instance.completer
         self.instance = self.dynamicLoader.getModule().Parser(self.application, settings)
 
         if needToSetCompleter:
-            self.application.setCompleterFunction(self.instance.completer.complete)
+            self.application.setCompleter(self.instance.completer)
 
     def getInstance(self) -> Parser.Parser:
         if self.dynamicLoader.checkNeedsReload():
@@ -37,8 +37,8 @@ class ParserContainer():
             
             # Check if we need to reset the readline completer also
             # since the completer class, which holds the completer function, is stored in the Parser.
-            completerFunction = self.application.getCompleterFunction()
-            needToSetCompleter = completerFunction == self.instance.completer.complete
+            completer = self.application.getCompleter()
+            needToSetCompleter = completer == self.instance.completer
             
             # Actually reload the module and create new instance with restored settings.
             self.dynamicLoader.reloadModule()
@@ -46,7 +46,7 @@ class ParserContainer():
             
             # Set the completer if required
             if needToSetCompleter:
-                self.application.setCompleterFunction(self.instance.completer.complete)
+                self.application.setCompleter(self.instance.completer)
 
         return self.instance
 
