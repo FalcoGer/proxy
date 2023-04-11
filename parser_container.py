@@ -35,8 +35,9 @@ class ParserContainer():
             # Save settings
             settings = self.instance.settings
             
-            # Check if we need to reset the readline completer also
-            # since the completer class, which holds the completer function, is stored in the Parser.
+            # Check if we need to reset the completer also
+            # Compare the current completer with the one we have stored.
+            # If they are the same then we need to reload the completer also.
             completer = self.application.getCompleter()
             needToSetCompleter = completer == self.instance.completer
             

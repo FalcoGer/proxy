@@ -139,7 +139,7 @@ class Parser(base_parser.Parser):
         ret = super()._buildCommandDict()
         
         # Add your custom commands here
-        ret['example']      = (self._cmd_example, 'Sends the string in the example setting count times to the client.\nUsage: {0} [upper | lower | as_is] <count>\nExample {0} as_is 10.', [self._exampleCompleter, None, None])
+        ret['example']      = (self._cmd_example, 'Sends the string in the example setting count times to the client.\nUsage: {0} [upper | lower | as_is] <count>\nExample {0} as_is 10.', [self._exampleCompleter, None])
         # Alises
         ret['ex']           = ret['example']
         return ret
@@ -183,7 +183,7 @@ class Parser(base_parser.Parser):
 
     ###############################################################################
     # Completers go here.
-    # see readline_buffer_status.py for which values are available
+    # See buffer_status.py for which values are available
     # Append any options you want to be in the auto completion list to completer.candidates
     # See core_parser.py for examples
 

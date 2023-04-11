@@ -161,7 +161,7 @@ class Parser(core_parser.Parser):
         sendStringNote = 'Usage: {0} <String>\nExample: {0} hello\\!\\n\nNote: Leading spaces in the string are sent\nexcept for the space between the command and\nthe first character of the string.\nEscape sequences are available.'
         sendFileNote = 'Usage: {0} filename\nExample: {0} /home/user/.bashrc'
 
-        ret['hexdump']      = (self._cmd_hexdump, 'Configure the hexdump or show current configuration.\nUsage: {0} [yes|no] [<BytesPerLine>] [<BytesPerGroup>]', [self._yesNoCompleter, None, None, None])
+        ret['hexdump']      = (self._cmd_hexdump, 'Configure the hexdump or show current configuration.\nUsage: {0} [yes|no] [<BytesPerLine>] [<BytesPerGroup>]', [self._yesNoCompleter, None, ])
         ret['notify']       = (self._cmd_notify, 'Configure packet notifications.\nUsage: {0} [yes|no]\nIf argument omitted, this will toggle the notifications.', [self._yesNoCompleter, None])
         ret['h2s']          = (self._cmd_h2s, f'Send arbitrary hex values to the server.\n{sendHexNote}', None)
         ret['s2s']          = (self._cmd_s2s, f'Send arbitrary strings to the server.\n{sendStringNote}', None)

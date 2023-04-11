@@ -27,13 +27,17 @@ class CustomCompleter(Completer):
             bufferStatus: BufferStatus = BufferStatus(document)
             
             self.candidates = []
-
-            with open('bufferStatus.log', 'at', encoding='utf-8') as file:
-                file.write(f'{bufferStatus}\n\n')
+            
+            prevChar = None
+            if bufferStatus.begin > 0:
+                prevChar = document.current_line[bufferStatus.begin - 1]
 
             if bufferStatus.being_completed.startswith('!'):
                 # completing history substitution
-                self.getHistIdxCandidates(True, bufferStatus)
+                self.getHistIdxCandidates(True, document)
+            elif prevChar == '!':
+                # completing history substitution
+                self.getHistIdxCandidates(False, document)
             elif bufferStatus.being_completed.startswith('$'):
                 # completing variable
                 self.getVariableCandidates(True, bufferStatus)
@@ -76,14 +80,14 @@ class CustomCompleter(Completer):
             try:
                 pos, _ = document.find_boundaries_of_current_word()
                 # expand the history completion to the full line
-                if len(self.candidates) == 1 and self.candidates[0] is not None and self.candidates[0][0] == '!':
-                    histIdx = int(self.candidates[0][1:])
-                    yield Completion(text=self.application.getHistoryItem(histIdx), start_position=pos)
-                    return Completion(text=f'!{histIdx}', start_position=pos)
+                    
+                if len(self.candidates) == 1 and self.candidates[0] is not None and prevChar == '!':
+                    histIdx = int(self.candidates[0])
+                    yield Completion(text=self.application.getHistoryItem(histIdx), start_position=pos - 1)
                 else:
                     for candidate in self.candidates:
                         yield Completion(text=candidate, start_position=pos)
-                    return None
+                return None
             except IndexError:
                 return None
             # pylint: disable=broad-except
@@ -93,11 +97,13 @@ class CustomCompleter(Completer):
         
         return None
     
-    def getHistIdxCandidates(self, includePrefix: bool, bufferStatus: BufferStatus) -> typing.NoReturn:
+    def getHistIdxCandidates(self, includePrefix: bool, document: Document) -> typing.NoReturn:
         # Complete possible values only if there is not a complete match.
         # If there is a complete match, return that one only.
         # For example if completing '!3' but '!30' and '!31' are also available
         # then return only '!3'.
+
+        bufferStatus = BufferStatus(document)
 
         historyLines = self.application.getHistoryList()
         historyIndexes = list(idx for idx, _ in enumerate(historyLines))

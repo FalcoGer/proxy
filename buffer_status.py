@@ -39,13 +39,13 @@ class BufferStatus():
 
     def _getWordIdx(self) -> int:
         # Which word are we currently completing
-        # Words based on spaces, not readline separators
+        # Words based on spaces, not completion separators
         
         if self.begin == 0:
             return 0
 
         if self.begin > len(self.origline):
-            # readline.get_beginidx only updates when completion is requested
+            # begin only updates when completion is requested
             # return 0 to avoid index error
             return 0
 

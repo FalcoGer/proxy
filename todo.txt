@@ -5,6 +5,11 @@ Do:
 
 - Naming stype eSocketRole and members
 
+- more cool features from prompt toolkit
+    - progress bars
+    - dialogue boxes
+    - file selection possible?
+
 - More typing, such as typing.Final
 
 - Test every command
@@ -31,7 +36,6 @@ Do:
 Fix:
 - pack/unpack c_string and pascal_string not working right
 - file completion not working with filenames with spaces
-- Instant historyid -> history line doesn't work
 - only print 'use quit or exit' on ctrl+c when buffer empty
 
 Ideas:

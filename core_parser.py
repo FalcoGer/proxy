@@ -123,12 +123,12 @@ class Parser():
         ret['select']       = (self._cmd_select, f'Select a different proxy to give commands to.\nUsage: {{0}} <Proxy>\n{proxySelectionNote}', [self._proxyNameCompleter, None])
         ret['deselect']     = (self._cmd_deselect, 'Deselect the currently selected proxy.\nUsage: {0}', None)
         ret['new']          = (self._cmd_new, 'Create a new proxy.\nUsage: {0} <LocalPort> <RemotePort> <host> [<ProxyName>] [<ParserModule>]', [None, None, None, None, self._parserNameCompleter, None])
-        ret['kill']         = (self._cmd_kill, f'Stop a proxy.\nUsage: {{0}} [<Proxy>]\nIf Proxy is omitted, this kills the currently selected proxy.\n{proxySelectionNote}', [self._proxyNameCompleter])
-        ret['rename']       = (self._cmd_rename, f'Rename a proxy.\nUsage: {{0}} [<Proxy>] <NewName>\nIf Proxy is omitted, this renames the currently selected proxy.\n{proxySelectionNote}', [self._proxyNameCompleter, None, None])
+        ret['kill']         = (self._cmd_kill, f'Stop a proxy.\nUsage: {{0}} [<Proxy>]\nIf Proxy is omitted, this kills the currently selected proxy.\n{proxySelectionNote}', [self._proxyNameCompleter, None])
+        ret['rename']       = (self._cmd_rename, f'Rename a proxy.\nUsage: {{0}} [<Proxy>] <NewName>\nIf Proxy is omitted, this renames the currently selected proxy.\n{proxySelectionNote}', [self._proxyNameCompleter, None])
         ret['disconnect']   = (self._cmd_disconnect, f'Disconnect from the client and server.\nUsage: {{0}} [<Proxy>]\n{proxySelectionNote}', [self._proxyNameCompleter, None])
         ret['loadparser']   = (self._cmd_loadparser, f'Load a custom parser for proxy.\nUsage: {{0}} [<Proxy>] <ParserName>\nExample: {{0}} PROXY_8080 example_parser\nIf Proxy is omitted, this changes the parser of the currently selected proxy.\n{proxySelectionNote}', [self._proxyNameCompleter, self._parserNameCompleter, None])
         ret['lsproxy']      = (self._cmd_lsproxy, 'Display all configured proxies and their status.\nUsage: {0}', None)
-        ret['run']          = (self._cmd_run, 'Runs a script file.\nUsage: {0} <FilePath> [<LineNumber>]\nIf line number is given, the script will start execution on that line.\nLines starting with "#" will be ignored.', [self._fileCompleter, None, None])
+        ret['run']          = (self._cmd_run, 'Runs a script file.\nUsage: {0} <FilePath> [<LineNumber>]\nIf line number is given, the script will start execution on that line.\nLines starting with "#" will be ignored.', [self._fileCompleter, None])
         ret['clearhistory'] = (self._cmd_clearhistory, 'Clear the command history or delete one entry of it.\nUsage: {0} [<HistoryIndex>].\nNote: The history file will written only on exit.', None)
         ret['lshistory']    = (self._cmd_lshistory, 'Show the command history or display one entry of it.\nUsage: {0} [<HistoryIndex>]', None)
         ret['lssetting']    = (self._cmd_lssetting, 'Show the current settings or display a specific setting.\nUsage: {0} [<SettingName>]', [self._settingsCompleter, None])
@@ -140,7 +140,7 @@ class Parser():
         ret['clearvars']    = (self._cmd_clearvars, 'Clears variables.\nUsage: {0}', None)
         ret['pack']         = (self._cmd_pack, 'Packs data into a different format.\nUsage: {0} <DataType> <Format> <Data> [<Data> ...]\nNote: Data is separated by spaces.\nExample: {0} int little_endian 255 0377 0xFF\nExample: {0} byte little_endian 41 42 43 44\nExample: {0} uchar little_endian x41 x42 x43 x44\nRef: https://docs.python.org/3/library/struct.html\nNote: Use auto-complete.', [self._packDataTypeCompleter, self._packFormatCompleter, None])
         ret['unpack']       = (self._cmd_unpack, 'Unpacks and displays data from a different format.\nUsage: {0} <DataType> <Format> <HexData>\nNote: Hex data may contain spaces, they are ignored.\nExample: {0} int little_endian 01000000 02000000\nExample: {0} c_string native 41424344\nRef: https://docs.python.org/3/library/struct.html\nNote: Use auto-complete.', [self._packDataTypeCompleter, self._packFormatCompleter, None])
-        ret['convert']      = (self._cmd_convert, 'Converts numbers from one type to all others.\nUsage: {0} [<SourceFormat>] <Number>\nExample: {0} dec 65\nExample: {0} 0x41\nNote: If source format is not specified, it will be derrived from the format of the number itself.', [self._convertTypeCompleter, None, None])
+        ret['convert']      = (self._cmd_convert, 'Converts numbers from one type to all others.\nUsage: {0} [<SourceFormat>] <Number>\nExample: {0} dec 65\nExample: {0} 0x41\nNote: If source format is not specified, it will be derrived from the format of the number itself.', [self._convertTypeCompleter, None])
 
         # Aliases
         ret['exit']         = ret['quit']
