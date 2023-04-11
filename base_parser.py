@@ -128,7 +128,7 @@ class Parser(core_parser.Parser):
             dataLenStr = f'<green><b>{dataLenStr}</b></green>'
             
             # Put it all together.
-            output.append(to_formatted_text(HTML(f'{tsStr} - {proxyStr} {pktNrStr} {directionStr} - {dataLenStr}')))
+            output.append(f'{tsStr} - {proxyStr} {pktNrStr} {directionStr} - {dataLenStr}')
         
         # Output a hexdump if enabled.
         if self.getSetting(EBaseSettingKey.HEXDUMP_ENABLED):

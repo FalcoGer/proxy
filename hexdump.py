@@ -218,8 +218,8 @@ class Hexdump():
         for addr in range(0, len(src), self.bytesPerLine):
             # The chars we need to process for this line
             byteArray = src[addr : addr + self.bytesPerLine]
-            lines.append(to_formatted_text(HTML(self.constructLine(addr, maxAddrLen, byteArray))))
-        lines.append(to_formatted_text(HTML(self.constructByteTotal(len(src), maxAddrLen))))
+            lines.append(self.constructLine(addr, maxAddrLen, byteArray))
+        lines.append(self.constructByteTotal(len(src), maxAddrLen))
         return lines
 
     def constructLine(self, address: int, maxAddrLen: int, byteArray: bytes) -> str:

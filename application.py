@@ -13,8 +13,8 @@ import time
 # neat functionality such as toolbars, button prompts, progress bars and more
 # REF: https://python-prompt-toolkit.readthedocs.io/en/stable/pages/getting_started.html
 import prompt_toolkit as pt
-from prompt_toolkit import print_formatted_text as print
-from prompt_toolkit.formatted_text import HTML, to_formatted_text
+from prompt_toolkit import print_formatted_text
+from prompt_toolkit.formatted_text import HTML
 
 from proxy import Proxy
 from parser_container import ParserContainer
@@ -87,7 +87,6 @@ class Application():
         while self._running:
             try:
                 try:
-                    print() # Empty line
                     # Set toolbar
                     self._sess.bottom_toolbar = f'{self.getSelectedProxy()}'
                     # Fetch command
@@ -245,7 +244,7 @@ class Application():
             raise KeyError(f'There already is a proxy with the name {proxyName}.')
 
         # Create proxy and default parser
-        proxy = Proxy(self._args.bind, remoteHost, localPort, remotePort, proxyName, self.packetHandler, self.outputHandler)
+        proxy = Proxy(self._args.bind, remoteHost, localPort, remotePort, proxyName, self.packetHandler, self.outputHandlerPlain)
         parser = ParserContainer(self.DEFAULT_PARSER_MODULE, self)
         
         # Add them to their dictionaries
@@ -412,26 +411,33 @@ class Application():
     def packetHandler(self, data: bytes, proxy: Proxy, origin: ESocketRole) -> typing.NoReturn:
         parser = self.getParserByProxy(proxy)
         output = parser.parse(data, proxy, origin)
-        self.outputHandler(output)
+        self.outputHandlerFancy(output)
         return
 
-    def outputHandler(self, output: list[str]) -> typing.NoReturn:
+    def outputHandlerPlain(self, output: list[str]) -> typing.NoReturn:
         # Don't print a new prompt if there is no output
         if output is None or len(output) == 0:
             return
 
-        # Get clear of the prompt
-        print()
-        
         # Print the output we were given to print
         if isinstance(output, list):
-            for line in output:
-                print(line)
+            print('\n'.join(output))
         else:
             print(output)
-        # Printing a new prompt is not required
-        # here since prompt_toolkit does that automatically
-        
+        sys.stdout.flush()
+        return
+
+
+    def outputHandlerFancy(self, output: list[str]) -> typing.NoReturn:
+        # Don't print a new prompt if there is no output
+        if output is None or len(output) == 0:
+            return
+
+        # Print the output we were given to print
+        if isinstance(output, list):
+            print_formatted_text(HTML('\n'.join(output)))
+        else:
+            print_formatted_text(HTML(output))
         sys.stdout.flush()
         return
 
@@ -440,7 +446,7 @@ class Application():
         try:
             history = pt.history.FileHistory(filename=self._HISTORY_FILE)
         except (OSError, PermissionError, IsADirectoryError, IOError) as e:
-            print(pt.HTML('<ansired>Error while trying to open history:</ansired>') + f'{e}')
+            print(f'Error while trying to open history: {e}')
             self._HISTORY_FILE = None # This is done to prevent messing with the file after there has been an error with it.
             history = pt.history.InMemoryHistory()
         self._sess: pt.PromptSession = pt.PromptSession(history=history)
