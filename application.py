@@ -418,12 +418,12 @@ class Application():
         # Don't print a new prompt if there is no output
         if output is None or len(output) == 0:
             return
-
         # Print the output we were given to print
         if isinstance(output, list):
-            print('\n'.join(output))
+            print_formatted_text('\n'.join(output))
         else:
-            print(output)
+            print_formatted_text(output)
+        self._sess.bottom_toolbar = f'{str(self.getSelectedProxy())}'
         sys.stdout.flush()
         return
 
@@ -432,12 +432,12 @@ class Application():
         # Don't print a new prompt if there is no output
         if output is None or len(output) == 0:
             return
-
         # Print the output we were given to print
         if isinstance(output, list):
             print_formatted_text(HTML('\n'.join(output)))
         else:
             print_formatted_text(HTML(output))
+        self._sess.bottom_toolbar = f'{str(self.getSelectedProxy())}'
         sys.stdout.flush()
         return
 
