@@ -44,6 +44,13 @@ Ideas:
     would allow sending more complex data than with netcat, and easily send files without reconnecting
     - import sockethandler into server and client classes, same as proxy, except the setup is different, should be easy
 
+- Allow writing of pcap files?
+    https://scapy.readthedocs.io/en/latest/installation.html
+    https://askldjd.com/2014/01/15/a-reasonably-fast-python-ip-sniffer/
+    https://gist.github.com/DiabloHorn/fb43f3555f60454a729ddf66f642fefb
+    - Support raw sockets, write custom TCP stack
+        https://www.binarytides.com/raw-socket-programming-in-python-linux/
+
 - Allow MitM SSL?
 
 - IPv6 support

@@ -157,9 +157,11 @@ class Proxy(Thread):
 
     def _bind(self, host: str, port: int) -> typing.NoReturn:
         self._outputHandler(f'[{self}]: Starting listening socket on {host}:{port}')
+        
         self._bindSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._bindSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._bindSocket.bind((host, port))
+
         self._bindSocket.listen(1)
         self._bindSocket.settimeout(self.BIND_SOCKET_TIMEOUT)
 
@@ -195,6 +197,7 @@ class Proxy(Thread):
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect((self._remoteAddr, self._remotePort))
+
             self._server = SocketHandler(sock, ESocketRole.server, self, self._outputHandler, self._packetHandler)
             return True
         # pylint: disable=broad-except
