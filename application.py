@@ -15,6 +15,7 @@ import time
 import prompt_toolkit as pt
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
+from prompt_toolkit.shortcuts import ProgressBar
 
 from proxy import Proxy
 from parser_container import ParserContainer
@@ -100,8 +101,14 @@ class Application():
                     # Allow clearing the buffer with ctrl+c
                     # TODO: find out how to check for empty buffer
                     if True:
-                        print('Type \'exit\' or \'quit\' to exit.')
-
+                        print('Type \'exit\' or \'quit\' to exit or use CTRL+D to force quit.')
+                    continue
+                except EOFError:
+                    # User hits Ctrl + D
+                    print('Received EOF, quitting.')
+                    self.stop()
+                    continue
+                
                 if cmd is None:
                     continue
 
@@ -136,11 +143,13 @@ class Application():
                 print(traceback.format_exc())
         
         # Shutdown proxies and then wait for the threads to finish.
-        for proxy in self._proxies.values():
-            proxy.shutdown()
-
-        for proxy in self._proxies.values():
-            proxy.join()
+        with ProgressBar(title='Shutdown proxy') as pb:
+            for proxy in pb(self._proxies.values()):
+                proxy.shutdown()
+        
+        with ProgressBar(title='Joining proxy threads') as pb:
+            for proxy in pb(self._proxies.values()):
+                proxy.join()
         return
 
     def runCommand(self, cmd: str) -> typing.Union[int, str]:
