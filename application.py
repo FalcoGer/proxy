@@ -91,7 +91,11 @@ class Application():
                     self._sess.bottom_toolbar = f'{self.getSelectedProxy()}'
                     # Fetch command
                     cmd = None
-                    cmd = self._sess.prompt(f'{self.getSelectedParser()} >')
+                    proxyName = "None"
+                    if self.getSelectedProxy() is not None:
+                        proxyName = self.getSelectedProxy().name
+                    prompt = f'<lime><b>{self.escapeHTML(proxyName)}</b></lime> <green>({self.escapeHTML(str(self.getSelectedParser()))})</green>&gt; '
+                    cmd = self._sess.prompt(HTML(prompt))
                 except KeyboardInterrupt:
                     # Allow clearing the buffer with ctrl+c
                     # TODO: find out how to check for empty buffer
