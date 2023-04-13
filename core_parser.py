@@ -553,7 +553,7 @@ class Parser():
         filePath = ' '.join(args[1:])
         try:
             with open(filePath, 'wt', encoding='utf-8') as file:
-                for varName in self.application.variables.keys():
+                for varName in self.application.getVariableNames():
                     varValue = self.application.getVariable(varName)
                     file.write(f'{varName} {varValue}\n')
         except (IsADirectoryError, PermissionError, FileNotFoundError) as e:
