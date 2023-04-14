@@ -88,10 +88,8 @@ class EColorSettingKey(Enum):
     DIGITS = auto()                 # ascii digits
     LETTERS = auto()                # ascii letters (a-z, A-Z)
     PRINTABLE = auto()              # other ascii characters
-    SPACE = auto()                  # space character (0x20)
     PRINTABLE_HIGH_ASCII = auto()   # printable, but value > 127
     CONTROL = auto()                # ascii control characters (below 0x20)
-    NULL_BYTE = auto()              # null byte
     NON_PRINTABLE = auto()          # everything else
     
     def __eq__(self, other) -> bool:
@@ -131,7 +129,7 @@ class Hexdump():
 
         self.colorSettings: dict[(typing.Union[EColorSettingKey, int], ColorSetting)] = {}
         
-        if defaultColors and self.colorSettings is not None:
+        if defaultColors:
             # FIXME: Colors
             # color available but not set
             # Formatting
@@ -193,11 +191,9 @@ class Hexdump():
         if isinstance(key, int) and not 0x00 >= key >= 0xFF:
             raise ValueError(f'Key must be within the range of bytes [0x00 .. 0xFF] but was {hex(key)}')
 
-        if self.colorSettings is not None:
-            self.colorSettings = colorSetting
         return
 
-    def unsetColorSetting(self, key: typing.Any) -> typing.NoReturn:
+    def unsetColorSetting(self, key: typing.Union[EColorSettingKey, int]) -> typing.NoReturn:
         if not isinstance(key,  EColorSettingKey) and not isinstance(key, int):
             raise TypeError(f'Key must be of type {repr(EColorSettingKey)} or {repr(int)}')
         if isinstance(key, int) and not 0x00 >= key >= 0xFF:
