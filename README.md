@@ -1,9 +1,9 @@
-A generic TCP proxy that can inspect, drop, alter and inject arbitrary TCP packages.
+A generic TCP proxy that can inspect, drop, alter and inject arbitrary TCP packets.
 
 The main features include:
 
 - An easily extensible command line interface with history and auto-complete to do anything you want.
-- Live update of your package parser and command line commands without the need to restart the application or reconnect the client. Your module is automatically reloaded when it has changed. You can even load entirely new parsers from files on the fly.
+- Live update of your packet parser and command line commands without the need to restart the application or reconnect the client. Your module is automatically reloaded when it has changed. You can even load entirely new parsers from files on the fly.
 - Display and decode packets based on your code to show them in a human readable format.
 - Built in hexdump with configurable colors.
 - Drop, forward, alter or inject packets based on your code, either with a custom command, or triggered when a packet arrives and matching your filter or even in a custom thread for more complex scenarios.
