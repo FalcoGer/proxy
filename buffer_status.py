@@ -11,7 +11,7 @@ class BufferStatus():
 
         # This containes the whole line in the line buffer
         self.origline           = self._doc.current_line
-        
+
         self.cursorPos          = self._doc.cursor_position
         # This is the index of the first character in the line buffer that is considered for completion
         # This is the index of the last character in the line buffer that is considered for completion
@@ -40,7 +40,7 @@ class BufferStatus():
     def _getWordIdx(self) -> int:
         # Which word are we currently completing
         # Words based on spaces, not completion separators
-        
+
         if self.begin == 0:
             return 0
 

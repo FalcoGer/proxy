@@ -82,7 +82,7 @@ class ESettingKey(Enum):
 
 # Class name must be Parser
 class Parser(base_parser.Parser):
-    
+
     # Define the parser name here as it should appear in the prompt
     def __str__(self) -> str:
         return 'Example'
@@ -92,7 +92,7 @@ class Parser(base_parser.Parser):
         userDefaultSettings = {
                 ESettingKey.EXAMPLE_SETTING: 'ExAmPlE'
             }
-        
+
         # Make sure to include the base class settings as well.
         defaultSettings = super().getDefaultSettings()
         return defaultSettings | userDefaultSettings
@@ -104,12 +104,12 @@ class Parser(base_parser.Parser):
     # Do not print here, instead append any console output you want to the output array, one line per entry.
     def parse(self, data: bytes, proxy: Proxy, origin: ESocketRole) -> list[str]:
         output = super().parse(data, proxy, origin)
-        
-        # A construct like this may be used to drop packets. 
+
+        # A construct like this may be used to drop packets.
         if data.find(b'drop') >= 0:
             output.append('Dropped')
             return output
-        
+
         # Do interesting stuff with the data here.
         data = data.replace(b'ding', b'dong')
 
@@ -137,7 +137,7 @@ class Parser(base_parser.Parser):
     # If you don't want to provide more completions, use None at the end.
     def _buildCommandDict(self) -> CommandDictType:
         ret = super()._buildCommandDict()
-        
+
         # Add your custom commands here
         ret['example']      = (self._cmd_example, 'Sends the string in the example setting count times to the client.\nUsage: {0} [upper | lower | as_is] <count>\nExample {0} as_is 10.', [self._exampleCompleter, None])
         # Alises
@@ -146,19 +146,19 @@ class Parser(base_parser.Parser):
 
     ###############################################################################
     # Command callbacks go here.
-    
+
     # If a command doesn't need to know which proxy it is
     # working on, simply use '_' as the third argument name
-    
+
     # Sends the example setting string a few times to the client.
     def _cmd_example(self, args: list[str], proxy: Proxy) -> typing.Union[int, str]:
         # args: transformation, count
         if len(args) != 3:
             print(self.getHelpText(args[0]))
             return 'Syntax error.'
-        
+
         dataStr = str(self.getSetting(ESettingKey.EXAMPLE_SETTING))
-        
+
         if args[1] == 'upper':
             dataStr = dataStr.upper()
         elif args[1] == 'lower':
@@ -168,10 +168,10 @@ class Parser(base_parser.Parser):
         else:
             print(self.getHelpText(args[0]))
             return f'Capitalize must be "upper", "lower" or "as_is", but was {args[1]}'
-        
+
         count = self._strToInt(args[2]) # this allows hex, bin and oct notations also
         data = dataStr.encode('utf-8')
-        
+
         # xmit count times
         if not proxy.getIsConnected():
             return 'Not connected'

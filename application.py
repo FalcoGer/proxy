@@ -35,14 +35,14 @@ class Application():
         self._selectedProxyName: str = None
         self._proxies: dict[(str, Proxy)] = {}
         self._parsers: dict[(Proxy, ParserContainer)] = {None: ParserContainer('core_parser', self)}
-        
+
         # parse command line arguments.
         arg_parser = argparse.ArgumentParser(description='Create multiple proxy connections. Provide multiple proxy parameters to create multiple proxies.')
         arg_parser.add_argument('-b', '--bind', metavar=('binding_address'), required=False, help='Bind IP-address for the listening socket. Default \'0.0.0.0\'', default='0.0.0.0')
         arg_parser.add_argument('-p', '--proxy', nargs=3, metavar=('lp', 'rp', 'host'), action='append', required=False, help='Local port to listen on as well as the remote port and host ip address or hostname for the proxy to connect to.')
 
         self._args = arg_parser.parse_args()
-        
+
         # Fix proxy argument Typing since nargs > 1 doesn't support multiple types such as (int, int, str)
         # REF: https://github.com/python/cpython/issues/82398
         if self._args.proxy is not None:
@@ -57,10 +57,10 @@ class Application():
                 print(f'Error: {e}')
                 arg_parser.print_usage()
                 raise e
-        
+
         # Setup the input system
         self.setupInput()
-        
+
         # Create a proxies and parsers based on arguments.
         if self._args.proxy is not None:
             for idx, proxyArgs in enumerate(self._args.proxy):
@@ -108,7 +108,7 @@ class Application():
                     print('Received EOF, quitting.')
                     self.stop()
                     continue
-                
+
                 if cmd is None:
                     continue
 
@@ -118,7 +118,7 @@ class Application():
                 except (ValueError, IndexError) as e:
                     print(f'Error during history expansion: {e}')
                     continue
-                
+
                 # Expand variable substitution
                 try:
                     variableExpandedCmd = self.expandVariableCommand(historyExpandedCmd)
@@ -128,25 +128,25 @@ class Application():
                 finally:
                     # add to the history either way.
                     self.addToHistory(historyExpandedCmd)
-                
+
                 # resolve escaped ! and $.
                 if cmd != variableExpandedCmd:
                     print(f'Expanded: {variableExpandedCmd}')
 
                 # Handle the command
-                cmdReturn = self.runCommand(variableExpandedCmd) 
+                cmdReturn = self.runCommand(variableExpandedCmd)
                 if cmdReturn != 0:
                     print(f'Error: {cmdReturn}')
             # pylint: disable=broad-except
             except Exception as e:
                 print(f'[EXCEPT] - User Input: {e}')
                 print(traceback.format_exc())
-        
+
         # Shutdown proxies and then wait for the threads to finish.
         with ProgressBar(title='Shutdown proxy') as pb:
             for proxy in pb(self._proxies.values()):
                 proxy.shutdown()
-        
+
         with ProgressBar(title='Joining proxy threads') as pb:
             for proxy in pb(self._proxies.values()):
                 proxy.join()
@@ -231,7 +231,7 @@ class Application():
             self._selectedProxyName = None
         else:
             self._selectedProxyName = proxy.name
-        
+
         # reload the correct completer
         self.setCompleter(self.getSelectedParser().completer)
         return
@@ -252,18 +252,18 @@ class Application():
             raise ValueError('proxyName must not be empty.')
         if ord(proxyName[0]) in range(ord('0'), ord('9') + 1):
             raise ValueError('proxyName must not start with a digit.')
-        
+
         if proxyName in self._proxies:
             raise KeyError(f'There already is a proxy with the name {proxyName}.')
 
         # Create proxy and default parser
         proxy = Proxy(self._args.bind, remoteHost, localPort, remotePort, proxyName, self.packetHandler, self.outputHandlerPlain)
         parser = ParserContainer(self.DEFAULT_PARSER_MODULE, self)
-        
+
         # Add them to their dictionaries
         self._proxies[proxy.name] = proxy
         self._parsers[proxy] = parser
-        
+
         # Start the proxy thread
         proxy.start()
         return
@@ -294,10 +294,10 @@ class Application():
             raise ValueError('newName must not be empty.')
         if ord(newName[0]) in range(ord('0'), ord('9') + 1):
             raise ValueError('newName must not start with a digit.')
-        
+
         if newName in self._proxies:
             raise KeyError(f'Proxy with name {newName} already exists.')
-        
+
         self._proxies[newName] = self._proxies.pop(proxy.name)
         # Make sure we update the selected proxy if we rename the currently selected one.
         if self._selectedProxyName == proxy.name:
@@ -309,14 +309,14 @@ class Application():
         proxy = self.getProxyByName(oldName)
         self.renameProxy(proxy, newName)
         return
-    
+
     def getVariableNames(self) -> list[str]:
         return list(self._variables)
 
     def getVariable(self, variableName: str) -> str:
         if not self.checkVariableName(variableName):
             raise ValueError(f'Bad variable name: "{variableName}"')
-        
+
         return self._variables.get(variableName, None)
 
     def setVariable(self, variableName: str, value: str) -> typing.NoReturn:
@@ -329,7 +329,7 @@ class Application():
     def unsetVariable(self, variableName: str) -> bool:
         if not self.checkVariableName(variableName):
             raise ValueError(f'Bad variable name: "{variableName}"')
-        
+
         if variableName not in self._variables:
             return False
 
@@ -346,13 +346,13 @@ class Application():
 
         # Those are forbidden characters in the variable names
         invalidChars = [' ', '$', '\\', '(', ')']
-        
+
         # Check if they occur
         for invalidChar in invalidChars:
             if invalidChar in list(variableName):
                 return False
         return True
-    
+
     def expandHistoryCommand(self, cmd: str) -> str:
         words = cmd.split(' ')
 
@@ -362,7 +362,7 @@ class Application():
                 histIdx = int(word[1:]) # Let it throw ValueError to notify user.
                 if not 0 <= histIdx < len(self._sess.history.get_strings()):
                     raise IndexError(f'History index {histIdx} is out of range.')
-                
+
                 historyItem = self._sess.history.get_strings()[histIdx]
                 words[idx] = historyItem
 
@@ -382,11 +382,11 @@ class Application():
                     words[idx] = self._variables[varname] # Let it throw KeyError to notify user.
         except KeyError as e:
             raise KeyError(f'Variable {word} does not exist: {e}') from e
-        
+
         # reassemble cmd
         variableExpandedCmd = ' '.join(words)
         return variableExpandedCmd
-    
+
     def getHistoryList(self) -> list[str]:
         return self._sess.history.get_strings()
 
@@ -463,13 +463,13 @@ class Application():
             self._HISTORY_FILE = None # This is done to prevent messing with the file after there has been an error with it.
             history = pt.history.InMemoryHistory()
         self._sess: pt.PromptSession = pt.PromptSession(history=history)
-        
+
         # Set completer
         self._sess.completer = self.getSelectedParser().completer
 
         # Automatically suggest from history
         self._sess.auto_suggest = pt.auto_suggest.AutoSuggestFromHistory()
-        
+
         # Disable mouse support to allow scrolling of
         # the text in the console via terminal emulator.
         self._sess.mouse_support = False

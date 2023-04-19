@@ -34,17 +34,17 @@ class ParserContainer():
         if self.dynamicLoader.checkNeedsReload():
             # Save settings
             settings = self.instance.settings
-            
+
             # Check if we need to reset the completer also
             # Compare the current completer with the one we have stored.
             # If they are the same then we need to reload the completer also.
             completer = self.application.getCompleter()
             needToSetCompleter = completer == self.instance.completer
-            
+
             # Actually reload the module and create new instance with restored settings.
             self.dynamicLoader.reloadModule()
             self.instance = self.dynamicLoader.getModule().Parser(self.application, settings)
-            
+
             # Set the completer if required
             if needToSetCompleter:
                 self.application.setCompleter(self.instance.completer)

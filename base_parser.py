@@ -93,49 +93,49 @@ class Parser(core_parser.Parser):
         # Update packet number
         pktNr = self.getSetting(EBaseSettingKey.PACKET_NUMBER) + 1
         self.setSetting(EBaseSettingKey.PACKET_NUMBER, pktNr)
-        
+
         # Output a packet notification if enabled.
         if self.getSetting(EBaseSettingKey.PACKETNOTIFICATION_ENABLED):
             # Print out the data in a nice format.
             ts = time.time() - self.application.START_TIME
             tsStr = f'{ts:>14.8f}'
-            
+
             proxyStr = f'{proxy.name} ({self.application.getParserByProxy(proxy)})'
-            
+
             pktNrStr = f'[PKT# {pktNr}]'
 
             directionStr =  '[C -> S]' if origin == ESocketRole.client else '[C <- S]'
 
             dataLenStr = f'{len(data)} Byte{"s" if len(data) > 1 else ""}'
-            
+
             # Colorize output.
             tsStr = self.application.escapeHTML(tsStr)
             tsStr = f'<cyan>{tsStr}</cyan>'
 
             proxyStr = self.application.escapeHTML(proxyStr)
             proxyStr = f'<green><b>{proxyStr}</b></green>'
-            
+
             pktNrstr = self.application.escapeHTML(pktNrStr)
             pktNrStr = f'<yellow>{pktNrStr}</yellow>'
-            
+
             directionStr = self.application.escapeHTML(directionStr)
             if origin == ESocketRole.client:
                 directionStr = f'<style fg="white" bg="blue"><b>{directionStr}</b></style>'
             else:
                 directionStr = f'<style fg="white" bg="magenta"><b>{directionStr}</b></style>'
-            
+
             dataLenStr = self.application.escapeHTML(dataLenStr)
             dataLenStr = f'<green><b>{dataLenStr}</b></green>'
-            
+
             # Put it all together.
             output.append(f'{tsStr} - {proxyStr} {pktNrStr} {directionStr} - {dataLenStr}')
-        
+
         # Output a hexdump if enabled.
         if self.getSetting(EBaseSettingKey.HEXDUMP_ENABLED):
             hexdumpObj = self.getSetting(EBaseSettingKey.HEXDUMP)
             for line in hexdumpObj.hexdump(data):
                 output.append(line)
-        
+
         # Return the output.
         return output
 
@@ -171,12 +171,12 @@ class Parser(core_parser.Parser):
         ret['f2c']          = (self._cmd_f2c, f'Send arbitrary files to the client.\n{sendFileNote}', [self._fileCompleter, None])
 
         return ret
-    
+
     def _cmd_notify(self, args: list[str], _) -> typing.Union[int, str]:
         if not len(args) in [1, 2]:
             print(self.getHelpText(args[0]))
             return 'Syntax error.'
-        
+
         newState = not self.getSetting(EBaseSettingKey.PACKETNOTIFICATION_ENABLED)
         if len(args) == 2:
             if args[1] == 'yes':
@@ -186,7 +186,7 @@ class Parser(core_parser.Parser):
             else:
                 print(self.getHelpText(args[0]))
                 return 'Syntax error.'
-        
+
         self.setSetting(EBaseSettingKey.PACKETNOTIFICATION_ENABLED, newState)
         print(f'Packet notifications are now {"enabled" if newState else "disabled"}.')
 
@@ -205,7 +205,7 @@ class Parser(core_parser.Parser):
 
         # Allow spaces in hex string, so join with empty string to remove them.
         userInput = ''.join(args[1:])
-            
+
         pkt = bytes.fromhex(userInput)
         if proxy.getIsConnected():
             proxy.sendData(target, pkt)
@@ -242,11 +242,11 @@ class Parser(core_parser.Parser):
         if len(args) != 2:
             print(self.getHelpText(args[0]))
             return 'Syntax error.'
-        
+
         filePath = ' '.join(args[1:])
         if not os.path.isfile(filePath):
             return f'File "{filePath}" does not exist.'
-        
+
         byteArray = b''
         try:
             with open(filePath, 'rb') as file:
@@ -277,7 +277,7 @@ class Parser(core_parser.Parser):
             except ValueError as e:
                 print(self.getHelpText(args[0]))
                 return f'Syntax error: {e}'
-        
+
         if len(args) > 2:
             try:
                 bytesPerLine = self._strToInt(args[2])
@@ -286,7 +286,7 @@ class Parser(core_parser.Parser):
             except ValueError as e:
                 print(self.getHelpText(args[0]))
                 return f'Syntax error: {e}'
-        
+
         if len(args) > 1:
             if args[1].lower() == 'yes':
                 enabled = True
@@ -295,7 +295,7 @@ class Parser(core_parser.Parser):
             else:
                 print(self.getHelpText(args[0]))
                 return 'Syntax error: Must be "yes" or "no".'
-        
+
         # Write back settings
         self.setSetting(EBaseSettingKey.HEXDUMP_ENABLED, enabled)
         hexdumpObj.setBytesPerLine(bytesPerLine)

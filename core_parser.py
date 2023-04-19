@@ -74,7 +74,7 @@ class Parser():
                 self.settings[settingKey] = self.getDefaultSettings()[settingKey]
         # Remove any settings that are no longer in the list
         for settingKey in list(filter(lambda settingKey: settingKey not in self.getSettingKeys(), self.settings.keys())):
-            self.settings.pop(settingKey) 
+            self.settings.pop(settingKey)
 
     def getSettingKeys(self) -> list[Enum]:
         return list(ECoreSettingKey)
@@ -149,10 +149,10 @@ class Parser():
 
         ret['lsh']          = ret['lshistory']
         ret['clh']          = ret['clearhistory']
-        
+
         ret['lsv']          = ret['lsvars']
         ret['clv']          = ret['clearvars']
-        
+
         return ret
 
     def _cmd_help(self, args: list[str], _) -> typing.Union[int, str]:
@@ -164,10 +164,10 @@ class Parser():
         if len(args) == 2 and args[1] in self.commandDictionary:
             print(self.getHelpText(args[1]))
             return 0
-        
+
         if len(args) == 2:
             return f'No such command: {args[1]}.'
-        
+
         # Print
         # Find the longest key for neat formatting.
         maxLen = max(len(key) for key in self.commandDictionary)
@@ -178,7 +178,7 @@ class Parser():
         print() # Make some space.
         for idx, cmdname in enumerate(self.commandDictionary):
             print(f'{cmdname.ljust(maxLen)}', end=('' if (idx + 1) % maxCmdsPerLine != 0 else '\n'))
-        
+
         print('\n\nUse "help <cmdName>" to find out more about how to use a command.')
         # Print general CLI help also
         print('Prompt toolkit extensions are available.')
@@ -195,7 +195,7 @@ class Parser():
         if len(args) not in [1, 2]:
             print(self.getHelpText(args[0]))
             return 'Syntax error.'
-        
+
         proxyToDisconnect = proxy
         if len(args) == 2:
             try:
@@ -216,20 +216,20 @@ class Parser():
         if len(args) != 2:
             print(self.getHelpText(args[0]))
             return 'Syntax error.'
-        
+
         try:
             proxy: Proxy = self._aux_get_proxy_by_arg(args[1])
             self.application.selectProxy(proxy)
         except (IndexError, KeyError) as e:
             return f'Unable to select proxy {args[1]}: {e}'
-        
+
         return 0
 
     def _cmd_deselect(self, args: list[str], _) -> typing.Union[int, str]:
         if len(args) > 1:
             print(self.getHelpText(args[0]))
             return 'Syntax error.'
-        
+
         self.application.selectProxy(None)
         return 0
 
@@ -243,12 +243,12 @@ class Parser():
             lp = self._strToInt(args[1])
         except ValueError as e:
             return f'Could not convert {args[1]} into a number: {e}'
-        
+
         try:
             rp = self._strToInt(args[2])
         except ValueError as e:
             return f'Could not convert {args[2]} into a number: {e}'
-        
+
         host = args[3]
         name = f'PROXY_{lp}'
         parserName = self.application.DEFAULT_PARSER_MODULE
@@ -256,7 +256,7 @@ class Parser():
             name = args[4]
         if len(args) >= 6:
             parserName = args[5]
-        
+
         try:
             self.application.createProxy(name, lp, rp, host)
         except (ValueError, KeyError) as e:
@@ -285,11 +285,11 @@ class Parser():
         elif proxyToKill is None:
             print(self.getHelpText(args[0]))
             return 'No proxy selected.'
-        
+
         print(f'Shutting down {proxyToKill}.')
         print(f'This can take up to {proxyToKill.BIND_SOCKET_TIMEOUT} seconds.')
         self.application.killProxy(proxyToKill)
-        
+
         return 0
 
     def _cmd_rename(self, args: list[str], proxy: Proxy) -> typing.Union[int, str]:
@@ -313,7 +313,7 @@ class Parser():
             return f'Could not rename proxy to {args[-1]}: {e}'
 
         return 0
-    
+
     def _aux_get_proxy_by_arg(self, arg: str) -> Proxy:
         try:
             num = self._strToInt(arg) # Raises ValueError
@@ -341,7 +341,7 @@ class Parser():
             return f'Could not load {parserName}: {e}'
         except KeyError as e:
             return f'Could not find proxy by {args[1]}: {e}'
-            
+
         return 0
 
     def _cmd_lsproxy(self, args: list[str], _) -> typing.Union[int, str]:
@@ -373,7 +373,7 @@ class Parser():
                 return f'Syntax error: {e}'
         if not os.path.exists(filePath):
             return f'Could not locate {repr(firstTryPath)} or {repr(filePath)}.'
-        
+
         with open(filePath, 'rt', encoding='utf-8') as file:
             # pop lineNr lines off the buffer
             for x in range(1, lineNr):
@@ -384,13 +384,13 @@ class Parser():
             while line := file.readline():
                 # strip leading spaces and trailing new line
                 cmdToExecute = line.lstrip()[:-1]
-                
+
                 # Expand variable names
                 try:
                     cmdToExecute = self.application.expandVariableCommand(cmdToExecute)
                 except KeyError as e:
                     return f'Error during variable expansion at line {lineNr} in {repr(filePath)}: {e}'
-                
+
                 # execute command
                 try:
                     cmdReturn = self.application.runCommand(cmdToExecute)
@@ -412,7 +412,7 @@ class Parser():
         if len(args) > 2:
             print(self.getHelpText(args[0]))
             return 'Syntax error.'
-        
+
         if len(args) == 2:
             try:
                 idx = self._strToInt(args[1])
@@ -426,7 +426,7 @@ class Parser():
                 return 0
             except IndexError as e:
                 return f'Invalid history index {idx}: {e}'
-        
+
         # Print them all.
         for idx, historyLine in enumerate(self.application.getHistoryList()):
             if historyLine is None:
@@ -469,7 +469,7 @@ class Parser():
                 return 'Syntax error'
             if not args[1] in [x.name for x in self.getSettingKeys()]:
                 return f'{args[1]} is not a valid setting.'
-            
+
             settingKey = None
             for settingKey in self.getSettingKeys():
                 if settingKey.name == args[1]:
@@ -477,7 +477,7 @@ class Parser():
             value = self.getSetting(settingKey)
             print(f'{settingKey.name}: {value}')
             return 0
-        
+
         if len(self.getSettingKeys()) == 0:
             print('There are no settings for this parser.')
             return 0
@@ -495,12 +495,12 @@ class Parser():
         if len(args) < 3:
             print(self.getHelpText(args[0]))
             return 'Syntax error.'
-        
+
         varName = args[1]
         if len(varName) == 0:
             print(self.getHelpText(args[0]))
             return 'Syntax error.'
-        
+
         # variable values may have spaces in them.
         varValue = ' '.join(args[2:])
         self.application.setVariable(varName, varValue)
@@ -531,7 +531,7 @@ class Parser():
             else:
                 return f'{varName} is not defined.'
             return 0
-        
+
         variableNames = self.application.getVariableNames()
         if len(variableNames) == 0:
             print('No variables defined.')
@@ -549,7 +549,7 @@ class Parser():
         if len(args) != 2:
             print(self.getHelpText(args[0]))
             return 'Syntax error.'
-        
+
         filePath = ' '.join(args[1:])
         try:
             with open(filePath, 'wt', encoding='utf-8') as file:
@@ -565,7 +565,7 @@ class Parser():
         if len(args) != 2:
             print(self.getHelpText(args[0]))
             return 'Syntax error.'
-        
+
         filePath = ' '.join(args[1:])
         try:
             loadedVars = {}
@@ -596,7 +596,7 @@ class Parser():
                         loadedVars[varName] = varValue
                     except (ValueError, KeyError) as e:
                         return f'Line {lineNumber} {repr(line)}, could not extract variable from file {repr(filePath)}: {e}'
-            
+
             # Everything loaded successfully
             for kvp in loadedVars.items():
                 self.application.setVariable(kvp[0], kvp[1])
@@ -619,7 +619,7 @@ class Parser():
         if len(args) < 4:
             print(self.getHelpText(args[0]))
             return 'Syntax error.'
-        
+
         formatMapping = self._aux_pack_getFormatMapping()
         dataTypeMapping = self._aux_pack_getDataTypeMapping()
 
@@ -628,16 +628,16 @@ class Parser():
         dataTypeMappingString = args[1]
         if dataTypeMappingString not in dataTypeMapping:
             return f'Syntax error. Data type {dataTypeMappingString} unknown, must be one of {dataTypeMapping.keys()}.'
-        
+
         formatMappingString = args[2]
         if formatMappingString not in formatMapping:
             return f'Syntax error. Format {formatMappingString} unknown, must be one of {formatMapping.keys()}.'
-        
+
         if dataTypeMapping[dataTypeMappingString] in ['n', 'N'] and formatMapping[formatMappingString] != formatMapping['native']:
             return f'format for data type {dataTypeMappingString} must be native (@).'
 
         formatString = f'{formatMapping[formatMappingString]}{dataCount}{dataTypeMapping[dataTypeMappingString]}'
-        
+
         dataStrArray = args[3:]
         # Convert data according to the format
         convertedData = []
@@ -648,7 +648,7 @@ class Parser():
             packedValues = struct.pack(formatString, *convertedData)
         except struct.error as e:
             return f'Unable to pack {convertedData} with format {formatString}: {e}'
-        
+
         print(f'Packed: {packedValues}')
         asHex = ''
         for byte in packedValues:
@@ -660,24 +660,24 @@ class Parser():
         if len(args) < 4:
             print(self.getHelpText(args[0]))
             return 'Syntax error.'
-        
+
         formatMapping = self._aux_pack_getFormatMapping()
         dataTypeMapping = self._aux_pack_getDataTypeMapping()
-        
+
         dataTypeMappingString = args[1]
         if dataTypeMappingString not in dataTypeMapping:
             return f'Syntax error. Data type {dataTypeMappingString} unknown, must be one of {dataTypeMapping.keys()}.'
-        
+
         formatMappingString = args[2]
         if formatMappingString not in formatMapping:
             return f'Syntax error. Format {formatMappingString} unknown, must be one of {formatMapping.keys()}.'
-        
+
         if dataTypeMapping[dataTypeMappingString] in ['n', 'N'] and formatMapping[formatMappingString] != formatMapping['native']:
             return f'format for data type {dataTypeMappingString} must be native (@).'
-        
+
         hexDataStr = ''.join(args[3:]) # Joining on '' eliminates spaces.
         byteArray = bytes.fromhex(hexDataStr)
-        
+
         # calculate how many values we have
         dataTypeSize = struct.calcsize(f'{formatMapping[formatMappingString]}{dataTypeMapping[dataTypeMappingString]}')
         if len(byteArray) % dataTypeSize != 0:
@@ -690,7 +690,7 @@ class Parser():
             unpackedValues = struct.unpack(formatString, byteArray)
         except struct.error as e:
             return f'Unable to unpack {byteArray} with format {formatString}: {e}'
-        
+
         print(f'Unpacked: {unpackedValues}')
         return 0
 
@@ -746,7 +746,7 @@ class Parser():
             'c_string': 's',
             'void_ptr': 'P'
         }
-        
+
         # allow the raw values also
         values = copy(mapping).values()
         for value in values:
@@ -758,12 +758,12 @@ class Parser():
         if len(args) not in [2, 3]:
             print(self.getHelpText(args[0]))
             return 'Syntax error.'
-        
+
         # figure out the format
         if len(args) == 3:
             formatString = args[1]
             numberString = args[2]
-       
+
             try:
                 if formatString == 'dec':
                     number = int(numberString, 10)
@@ -780,13 +780,13 @@ class Parser():
         else:
             numberString = args[1]
             number = self._strToInt(numberString)
-        
+
         # Also get a byte array out of it.
         hexString = f'{number:2X}'
         if len(hexString) % 2 == 1:
             hexString = '0' + hexString
         byteArray = bytes.fromhex(hexString)
-        
+
         # print the number
         print(f'DEC: {number}\nHEX: {hex(number)}\nOCT: {oct(number)}\nBIN: {bin(number)}\nBytes: {byteArray}')
         return 0
@@ -813,13 +813,13 @@ class Parser():
         dataTypeMapping = self._aux_pack_getDataTypeMapping()
         # 'n' and 'N' only available in native.
         nativeOnlyList = list(filter(lambda x: dataTypeMapping[x] in ['n', 'N'], dataTypeMapping.keys()))
-        
+
         if bufferStatus.words[1] in nativeOnlyList:
             self.completer.candidates.append('native')
             # '@' also valid, but omit for quicker typing.
             # self.completer.candidates.append('@')
             return
-        
+
         # Return all available options
         options = formatMapping.keys()
         for option in options:
@@ -886,7 +886,7 @@ class Parser():
                 if str(lp).startswith(bufferStatus.being_completed):
                     self.completer.candidates.append(str(lp))
             return
-        
+
         # Find Names otherwise. (Names can't start with a number)
         for proxy in self.application.getProxyList():
             if proxy.name.startswith(bufferStatus.being_completed):
@@ -906,7 +906,7 @@ class Parser():
                 if not fileName.endswith('.py'):
                     # Skip non python modules
                     continue
-                
+
                 if os.path.getsize(fileName) > FILE_SIZE_LIMIT_FOR_CHECK:
                     # Skip files that are too large to check
                     continue
@@ -928,11 +928,11 @@ class Parser():
                         break
             except (IOError, PermissionError, IsADirectoryError):
                 continue
-            
+
             if not isCandidate:
                 # Check next file
                 continue
-            
+
             self.completer.candidates.append(fileName[:-3])
         return
 
@@ -949,7 +949,7 @@ class Parser():
         if len(userInput.strip()) == 0:
             # Ignore empty commands
             return 0
-        
+
         if args[0] not in self.commandDictionary:
             return f'Undefined command: {repr(args[0])}'
 
@@ -997,7 +997,7 @@ class Parser():
                     num = int(octalBytes, 7)
                     newData += self._intToByte(num)
                     idx += 2 # skip 2 more bytes
-                    
+
                 elif nextByte == b'u':
                     raise Exception('\\uxxxx is not supported')
                 elif nextByte == b'U':

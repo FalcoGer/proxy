@@ -31,7 +31,7 @@ class DynamicLoader:
 
         if self.originHash != self.calculateFileHash():
             return True
-        
+
         return False
 
     def __str__(self) -> str:

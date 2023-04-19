@@ -14,19 +14,19 @@ class ColorSetting:
         if hexTagsOdd is None:
             hexTagsOdd = ''
         self._hexTagsOdd = (hexTagsOdd, self._getClosingTags(hexTagsOdd))
-        
+
         if hexTagsEven is None:
             hexTagsEven = hexTagsOdd
         self._hexTagsEven = (hexTagsEven, self._getClosingTags(hexTagsEven))
-        
+
         if printableTagsOdd is None:
             printableTagsOdd = hexTagsOdd
         self._printableTagsOdd = (printableTagsOdd, self._getClosingTags(printableTagsOdd))
-        
+
         if printableTagsEven is None:
             printableTagsEven = hexTagsEven
         self._printableTagsEven = (printableTagsEven, self._getClosingTags(printableTagsEven))
-        
+
         self._hexAttributes = (self._hexTagsOdd, self._hexTagsEven)
         self._printableAttributes = (self._printableTagsOdd, self._printableTagsEven)
         return
@@ -41,7 +41,7 @@ class ColorSetting:
             if c == '<':
                 tagStart = idx + 1
             if c == '>':
-                tagEnd = idx 
+                tagEnd = idx
             if tagStart <= tagEnd:
                 tagContent = tags[tagStart:tagEnd]
                 tagStart = 0
@@ -49,7 +49,7 @@ class ColorSetting:
                 tag = tagContent.split()[0]
                 closingTags.insert(0,f'</{tag}>')
         return ''.join(closingTags)
-    
+
     def __str__(self):
         return f'ColorSetting: {self._hexAttributes=}, {self._printableAttributes=}'
 
@@ -69,7 +69,7 @@ class ColorSetting:
                 else:
                     # odd or not enough attributes in the tuple (only gave the odd one)
                     attr = self._printableAttributes[0]
-        
+
         try:
             dataStr = dataStr.replace('&', '&amp;').replace('<', '&lt;').replace('>','&gt;')
             return f'{attr[0]}{dataStr}{attr[1]}'
@@ -83,7 +83,7 @@ class EColorSettingKey(Enum):
     SPACER_MINOR = auto()           # spacer between byte groups
     ADDRESS = auto()                # address at start of line
     BYTE_TOTAL = auto()             # color of the byte total at the end
-    
+
     # For data:
     DIGITS = auto()                 # ascii digits
     LETTERS = auto()                # ascii letters (a-z, A-Z)
@@ -91,7 +91,7 @@ class EColorSettingKey(Enum):
     PRINTABLE_HIGH_ASCII = auto()   # printable, but value > 127
     CONTROL = auto()                # ascii control characters (below 0x20)
     NON_PRINTABLE = auto()          # everything else
-    
+
     def __eq__(self, other) -> bool:
         if other is int:
             return self.value == other
@@ -120,7 +120,7 @@ class Hexdump():
         self.setBytesPerGroup(bytesPerGroup)
         self.setSep(sep)
         self.setPrintHighAscii(printHighAscii)
-        
+
         # If the length of a representation of a string is of length 3 (example "'A'") then it is printable
         # otherwise the representation would be something like "'\xff'" (len 6).
         # So this creates a list of character representations for every possible byte value.
@@ -128,7 +128,7 @@ class Hexdump():
         self.REPRESENTATION_ARRAY = ''.join([(len(repr(chr(b))) == 3 or repr(chr(b)) == '\'\\\\\'') and chr(b) or self.sep for b in range(256)])
 
         self.colorSettings: dict[(typing.Union[EColorSettingKey, int], ColorSetting)] = {}
-        
+
         if defaultColors:
             # FIXME: Colors
             # color available but not set
@@ -169,7 +169,7 @@ class Hexdump():
 
         self.bytesPerGroup = bytesPerGroup
         return
-    
+
     def setSep(self, sep: str = '.') -> typing.NoReturn:
         if not isinstance(sep, str):
             raise TypeError(f'{repr(sep)} is not {str}')
@@ -207,7 +207,7 @@ class Hexdump():
     def hexdump(self, src: bytes) -> list[str]:
         lines = []
         maxAddrLen = len(f'{(len(src)):X}')
-        
+
         # Round up to the nearest multiple of 4
         maxAddrLen = (int((maxAddrLen - 1) / 4) + 1) * 4
 
@@ -256,7 +256,7 @@ class Hexdump():
             # Add spacers, skip the last spacer if end of byte array
             if (idx + 1) % self.bytesPerGroup == 0 and (idx + 1) < self.bytesPerLine:
                 ret += minorSpacer
-        
+
         # Line up all the lines properly
         ret += minorSpacer * self.getRequiredPaddingLength(byteArray, 2)
 
@@ -273,20 +273,20 @@ class Hexdump():
             else:
                 # byte > 127 and don't print high ascii
                 c = self.sep
-            
+
             # colorize c
             colorSetting = self.getColorSetting(b)
             if colorSetting is not None:
                 c = colorSetting.colorize(c, idx % 2 == 0, ERepresentation.PRINTABLE)
             ret += c
-            
+
             # Add spacers, skip the last spacer if end of byte array
             if (idx + 1) % self.bytesPerGroup == 0 and (idx + 1) < self.bytesPerLine:
                 ret += minorSpacer
 
         # Add padding to line it all up
         ret += minorSpacer * self.getRequiredPaddingLength(byteArray, 1)
-        
+
         return f'|{ret}|'
 
     # figure out which color setting is to be used for the byte
@@ -295,7 +295,7 @@ class Hexdump():
             return None
 
         colorSetting = ColorSetting()
-        
+
         # Direct setting is available
         if byte in self.colorSettings:
             return self.colorSettings[byte]
@@ -306,7 +306,7 @@ class Hexdump():
         isControl = byte < 0x20
         isDigit = ord('0') <= byte <= ord('9')
         isLetter = (ord('a') <= byte <= ord('z')) or (ord('A') <= byte <= ord('Z'))
-        
+
         # Find out which color setting to use.
         colorSettingKey = None
         if (not isPrintable and not isControl) or (not self.printHighAscii and isHighAscii):
@@ -329,11 +329,11 @@ class Hexdump():
             colorSettingKey = EColorSettingKey.PRINTABLE
         else:
             raise ValueError(f'Can\'t figure out which color setting to use for {byte:02X}')
-        
+
         colorSetting = self.colorSettings.get(colorSettingKey, None)
         if colorSetting is None:
             colorSetting = ColorSetting()
-        
+
         return colorSetting
 
     def constructByteTotal(self, totalBytes: int, maxAddrLen: int) -> str:
@@ -352,7 +352,7 @@ class Hexdump():
         if self.bytesPerLine % self.bytesPerGroup == 0:
             # Remove the last spacer normally added if it would've been added at the end of the line.
             normalSpacerCount -= 1
-        
+
         normalLength = self.bytesPerLine * lenOfByteRepresentation + normalSpacerCount
         actualLength = (len(byteArray) * lenOfByteRepresentation) + actualSpacerCount
 
