@@ -8,17 +8,16 @@ import typing
 
 # struct is used to decode bytes into primitive data types
 # https://docs.python.org/3/library/struct.html
-import struct
 import os
 from enum import Enum, auto
 import time
+# pylint: disable=redefined-builtin
 from prompt_toolkit import print_formatted_text as print
-from prompt_toolkit.formatted_text import HTML, to_formatted_text
 
 # This is the base class for the base parser
 import core_parser
 
-from eSocketRole import ESocketRole
+from enum_socket_role import ESocketRole
 from hexdump import Hexdump
 
 # For type hints only
@@ -104,7 +103,7 @@ class Parser(core_parser.Parser):
 
             pktNrStr = f'[PKT# {pktNr}]'
 
-            directionStr =  '[C -> S]' if origin == ESocketRole.client else '[C <- S]'
+            directionStr =  '[C -> S]' if origin == ESocketRole.CLIENT else '[C <- S]'
 
             dataLenStr = f'{len(data)} Byte{"s" if len(data) > 1 else ""}'
 
@@ -115,11 +114,11 @@ class Parser(core_parser.Parser):
             proxyStr = self.application.escapeHTML(proxyStr)
             proxyStr = f'<green><b>{proxyStr}</b></green>'
 
-            pktNrstr = self.application.escapeHTML(pktNrStr)
+            pktNrStr = self.application.escapeHTML(pktNrStr)
             pktNrStr = f'<yellow>{pktNrStr}</yellow>'
 
             directionStr = self.application.escapeHTML(directionStr)
-            if origin == ESocketRole.client:
+            if origin == ESocketRole.CLIENT:
                 directionStr = f'<style fg="white" bg="blue"><b>{directionStr}</b></style>'
             else:
                 directionStr = f'<style fg="white" bg="magenta"><b>{directionStr}</b></style>'
@@ -193,10 +192,10 @@ class Parser(core_parser.Parser):
         return 0
 
     def _cmd_h2s(self, args: list[str], proxy: Proxy) -> typing.Union[int, str]:
-        return self._aux_cmd_send_hex(args, ESocketRole.server, proxy)
+        return self._aux_cmd_send_hex(args, ESocketRole.SERVER, proxy)
 
     def _cmd_h2c(self, args: list[str], proxy: Proxy) -> typing.Union[int, str]:
-        return self._aux_cmd_send_hex(args, ESocketRole.client, proxy)
+        return self._aux_cmd_send_hex(args, ESocketRole.CLIENT, proxy)
 
     def _aux_cmd_send_hex(self, args: list[str], target: ESocketRole, proxy: Proxy) -> typing.Union[int, str]:
         if len(args) == 1:
@@ -213,10 +212,10 @@ class Parser(core_parser.Parser):
         return 'Not connected.'
 
     def _cmd_s2s(self, args: list[str], proxy: Proxy) -> typing.Union[int, str]:
-        return self._aux_cmd_send_string(args, ESocketRole.server, proxy)
+        return self._aux_cmd_send_string(args, ESocketRole.SERVER, proxy)
 
     def _cmd_s2c(self, args: list[str], proxy: Proxy) -> typing.Union[int, str]:
-        return self._aux_cmd_send_string(args, ESocketRole.client, proxy)
+        return self._aux_cmd_send_string(args, ESocketRole.CLIENT, proxy)
 
     def _aux_cmd_send_string(self, args: list[str], target: ESocketRole, proxy: Proxy) -> typing.Union[int, str]:
         if len(args) == 1:
@@ -233,10 +232,10 @@ class Parser(core_parser.Parser):
         return 'Not connected.'
 
     def _cmd_f2s(self, args: list[str], proxy: Proxy) -> typing.Union[int, str]:
-        return self._aux_cmd_send_file(args, ESocketRole.server, proxy)
+        return self._aux_cmd_send_file(args, ESocketRole.SERVER, proxy)
 
     def _cmd_f2c(self, args: list[str], proxy: Proxy) -> typing.Union[int, str]:
-        return self._aux_cmd_send_file(args, ESocketRole.client, proxy)
+        return self._aux_cmd_send_file(args, ESocketRole.CLIENT, proxy)
 
     def _aux_cmd_send_file(self, args: list[str], target: ESocketRole, proxy: Proxy) -> typing.Union[int, str]:
         if len(args) != 2:

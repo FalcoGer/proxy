@@ -14,7 +14,7 @@ from queue import SimpleQueue
 from threading import Thread, Lock
 from time import sleep
 
-from eSocketRole import ESocketRole
+from enum_socket_role import ESocketRole
 
 try:
     import setproctitle
@@ -128,18 +128,18 @@ class Proxy(Thread):
         return
 
     def sendData(self, destination: ESocketRole, data: bytes) -> typing.NoReturn:
-        sh = self._client if destination == ESocketRole.client else self._server
+        sh = self._client if destination == ESocketRole.CLIENT else self._server
         if sh is None:
             return
         sh.send(data)
         return
 
     def sendToServer(self, data: bytes) -> typing.NoReturn:
-        self.sendData(ESocketRole.server, data)
+        self.sendData(ESocketRole.SERVER, data)
         return
 
     def sendToClient(self, data: bytes) -> typing.NoReturn:
-        self.sendData(ESocketRole.client, data)
+        self.sendData(ESocketRole.CLIENT, data)
         return
 
     def getClient(self) -> typing.Tuple[str, int]:
@@ -184,7 +184,7 @@ class Proxy(Thread):
 
         # Set new client
         try:
-            self._client = SocketHandler(sock, ESocketRole.client, self, self._outputHandler, self._packetHandler)
+            self._client = SocketHandler(sock, ESocketRole.CLIENT, self, self._outputHandler, self._packetHandler)
         except (OSError, TimeoutError) as e:
             self._outputHandler(f'[{self}]: New client tried to connect but exception occurred: {e}')
             return False
@@ -198,7 +198,7 @@ class Proxy(Thread):
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect((self._remoteAddr, self._remotePort))
 
-            self._server = SocketHandler(sock, ESocketRole.server, self, self._outputHandler, self._packetHandler)
+            self._server = SocketHandler(sock, ESocketRole.SERVER, self, self._outputHandler, self._packetHandler)
             return True
         # pylint: disable=broad-except
         except Exception as e:
@@ -250,7 +250,7 @@ class SocketHandler(Thread):
         self._lock = Lock()
 
     def _getName(self) -> str:
-        return ('C' if self._ROLE == ESocketRole.client else 'S') + f'_{self._proxy.name}'
+        return ('C' if self._ROLE == ESocketRole.CLIENT else 'S') + f'_{self._proxy.name}'
 
     def send(self, data: bytes) -> typing.NoReturn:
         self._dataQueue.put(data)

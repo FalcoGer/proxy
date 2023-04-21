@@ -3,8 +3,6 @@ Do:
     - hexdump
     - notification
 
-- Naming stype eSocketRole and members
-
 - more cool features from prompt toolkit
     - progress bars
     - dialogue boxes

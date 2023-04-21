@@ -7,7 +7,7 @@ import typing
 import base_parser
 
 # import stuff for API calls
-from eSocketRole import ESocketRole
+from enum_socket_role import ESocketRole
 
 if typing.TYPE_CHECKING:
     from proxy import Proxy
@@ -24,7 +24,7 @@ class Parser(base_parser.Parser):
         output = super().parse(data, proxy, origin)
 
         # Pass data through to the target.
-        if origin == ESocketRole.client:
+        if origin == ESocketRole.CLIENT:
             proxy.sendToServer(data)
         else:
             proxy.sendToClient(data)

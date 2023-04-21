@@ -19,7 +19,7 @@ from prompt_toolkit.shortcuts import ProgressBar
 
 from proxy import Proxy
 from parser_container import ParserContainer
-from eSocketRole import ESocketRole
+from enum_socket_role import ESocketRole
 
 if typing.TYPE_CHECKING:
     from core_parser import Parser

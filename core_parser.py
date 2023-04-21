@@ -15,7 +15,7 @@ from enum import Enum, auto
 from copy import copy
 from prompt_toolkit import print_formatted_text as print
 
-from eSocketRole import ESocketRole
+from enum_socket_role import ESocketRole
 from completer import CustomCompleter
 
 # For type hints only

@@ -3,8 +3,6 @@ from __future__ import annotations
 from enum import Enum, auto
 import typing
 
-from prompt_toolkit.formatted_text import HTML, to_formatted_text
-
 class ERepresentation(Enum):
     HEX = auto()
     PRINTABLE = auto()
@@ -70,12 +68,8 @@ class ColorSetting:
                     # odd or not enough attributes in the tuple (only gave the odd one)
                     attr = self._printableAttributes[0]
 
-        try:
-            dataStr = dataStr.replace('&', '&amp;').replace('<', '&lt;').replace('>','&gt;')
-            return f'{attr[0]}{dataStr}{attr[1]}'
-        except Exception as e:
-            print(f'Unable to color {repr(dataStr)} with {self}: {e}')
-            return dataStr
+        dataStr = dataStr.replace('&', '&amp;').replace('<', '&lt;').replace('>','&gt;')
+        return f'{attr[0]}{dataStr}{attr[1]}'
 
 class EColorSettingKey(Enum):
     # For formatting:
@@ -115,10 +109,10 @@ class EColorSettingKey(Enum):
 
 
 class Hexdump():
-    def __init__(self, bytesPerLine: int = 16, bytesPerGroup: int = 4, printHighAscii: bool = False, sep: str = '.', defaultColors: bool = True):
+    def __init__(self, bytesPerLine: int = 16, bytesPerGroup: int = 4, printHighAscii: bool = False, defaultColors: bool = True):
         self.setBytesPerLine(bytesPerLine)
         self.setBytesPerGroup(bytesPerGroup)
-        self.setSep(sep)
+        self.setSep('.')
         self.setPrintHighAscii(printHighAscii)
 
         # If the length of a representation of a string is of length 3 (example "'A'") then it is printable
@@ -130,7 +124,6 @@ class Hexdump():
         self.colorSettings: dict[(typing.Union[EColorSettingKey, int], ColorSetting)] = {}
 
         if defaultColors:
-            # FIXME: Colors
             # color available but not set
             # Formatting
             self.colorSettings[EColorSettingKey.ADDRESS]                = ColorSetting('<yellow><b>')
@@ -190,7 +183,7 @@ class Hexdump():
             raise ValueError(f'Key must be of type {repr(EColorSettingKey)} or {repr(int)}')
         if isinstance(key, int) and not 0x00 >= key >= 0xFF:
             raise ValueError(f'Key must be within the range of bytes [0x00 .. 0xFF] but was {hex(key)}')
-
+        self.colorSettings[key] = colorSetting
         return
 
     def unsetColorSetting(self, key: typing.Union[EColorSettingKey, int]) -> typing.NoReturn:

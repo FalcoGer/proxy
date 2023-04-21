@@ -20,12 +20,17 @@
 
 # will be default in python 3.11.
 # This is required for there to be no errors in the type hints.
+
+# pylint: disable=unused-import, wrong-import-order
+
 from __future__ import annotations
 import typing
 
 from enum import Enum, auto
 
+# pylint: disable=redefined-builtin
 from prompt_toolkit import print_formatted_text as print
+# pylint: enable=redefined-builtin
 from prompt_toolkit.formatted_text import HTML, to_formatted_text
 
 # struct is used to decode bytes into primitive data types
@@ -42,7 +47,7 @@ from hexdump import Hexdump
 import base_parser
 
 # import stuff for API calls
-from eSocketRole import ESocketRole
+from enum_socket_role import ESocketRole
 
 # For type hints only
 if typing.TYPE_CHECKING:
@@ -114,7 +119,7 @@ class Parser(base_parser.Parser):
         data = data.replace(b'ding', b'dong')
 
         # By default, send the data to the client/server.
-        if origin == ESocketRole.client:
+        if origin == ESocketRole.CLIENT:
             proxy.sendToServer(data)
         else:
             proxy.sendToClient(data)
