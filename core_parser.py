@@ -11,9 +11,11 @@ import typing
 # https://docs.python.org/3/library/struct.html
 import struct
 import os
-from enum import Enum, auto
+from enum import Enum
 from copy import copy
+# pylint: disable=redefined-builtin
 from prompt_toolkit import print_formatted_text as print
+# pylint: enable=redefined-builtin
 
 from enum_socket_role import ESocketRole
 from completer import CustomCompleter
