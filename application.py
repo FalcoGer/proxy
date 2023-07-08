@@ -18,11 +18,13 @@ from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import ProgressBar
 
 from proxy import Proxy
+# pylint: disable=wrong-import-order
 from parser_container import ParserContainer
 from enum_socket_role import ESocketRole
 
 if typing.TYPE_CHECKING:
     from core_parser import Parser
+
 
 class Application():
     def __init__(self):
@@ -34,12 +36,16 @@ class Application():
         self._running = True
         self._selectedProxyName: str = None
         self._proxies: dict[(str, Proxy)] = {}
-        self._parsers: dict[(Proxy, ParserContainer)] = {None: ParserContainer('core_parser', self)}
+        self._parsers: dict[(Proxy, ParserContainer)] = {
+            None: ParserContainer('core_parser', self)}
 
         # parse command line arguments.
-        arg_parser = argparse.ArgumentParser(description='Create multiple proxy connections. Provide multiple proxy parameters to create multiple proxies.')
-        arg_parser.add_argument('-b', '--bind', metavar=('binding_address'), required=False, help='Bind IP-address for the listening socket. Default \'0.0.0.0\'', default='0.0.0.0')
-        arg_parser.add_argument('-p', '--proxy', nargs=3, metavar=('lp', 'rp', 'host'), action='append', required=False, help='Local port to listen on as well as the remote port and host ip address or hostname for the proxy to connect to.')
+        arg_parser = argparse.ArgumentParser(
+            description='Create multiple proxy connections. Provide multiple proxy parameters to create multiple proxies.')
+        arg_parser.add_argument('-b', '--bind', metavar=('binding_address'), required=False,
+                                help='Bind IP-address for the listening socket. Default \'0.0.0.0\'', default='0.0.0.0')
+        arg_parser.add_argument('-p', '--proxy', nargs=3, metavar=('lp', 'rp', 'host'), action='append', required=False,
+                                help='Local port to listen on as well as the remote port and host ip address or hostname for the proxy to connect to.')
 
         self._args = arg_parser.parse_args()
 
@@ -83,58 +89,68 @@ class Application():
         self._running = False
         return
 
+    def _buildToolbarAndGetCmd(self) -> str:
+        cmd = None
+        try:
+            # Set toolbar
+            self._sess.bottom_toolbar = f'{self.getSelectedProxy()}'
+            # Fetch command
+            proxyName = "None"
+            if self.getSelectedProxy() is not None:
+                proxyName = self.getSelectedProxy().name
+            escapedProxyName = self.escapeHTML(proxyName)
+            escapedParserName = self.escapeHTML(str(self.getSelectedParser()))
+            prompt = f'<lime><b>{escapedProxyName}</b></lime> <green>({escapedParserName})</green>&gt; '
+            cmd = self._sess.prompt(HTML(prompt))
+        except KeyboardInterrupt:
+            # Allow clearing the buffer with ctrl+c
+            # TODO: find out how to check for empty buffer
+            if True:
+                print('Type \'exit\' or \'quit\' to exit or use CTRL+D to force quit.')
+        except EOFError:
+            # User hits Ctrl + D
+            print('Received EOF, quitting.')
+            self.stop()
+        return cmd
+
+    def _expandCommand(self, cmd: str) -> str:
+        historyExpandedCmd = cmd
+        variableExpandedCmd = None
+        try:
+            # Expand !<histIdx>
+            historyExpandedCmd = self.expandHistoryCommand(cmd)
+            # Expand variable substitution
+            variableExpandedCmd = self.expandVariableCommand(historyExpandedCmd)
+        except (ValueError, IndexError) as e:
+            print(f'Error during history expansion: {e}')
+            return None
+        except KeyError as e:
+            print(f'Error during variable expansion: {e}')
+            return None
+        finally:
+            # add to the history either way.
+            self.addToHistory(historyExpandedCmd)
+        # Print if different
+        if cmd != variableExpandedCmd:
+            print(f'Expanded: {variableExpandedCmd}')
+        return variableExpandedCmd
+
     def main(self) -> typing.NoReturn:
         # Accept user input and parse it.
         while self._running:
             try:
-                try:
-                    # Set toolbar
-                    self._sess.bottom_toolbar = f'{self.getSelectedProxy()}'
-                    # Fetch command
-                    cmd = None
-                    proxyName = "None"
-                    if self.getSelectedProxy() is not None:
-                        proxyName = self.getSelectedProxy().name
-                    prompt = f'<lime><b>{self.escapeHTML(proxyName)}</b></lime> <green>({self.escapeHTML(str(self.getSelectedParser()))})</green>&gt; '
-                    cmd = self._sess.prompt(HTML(prompt))
-                except KeyboardInterrupt:
-                    # Allow clearing the buffer with ctrl+c
-                    # TODO: find out how to check for empty buffer
-                    if True:
-                        print('Type \'exit\' or \'quit\' to exit or use CTRL+D to force quit.')
-                    continue
-                except EOFError:
-                    # User hits Ctrl + D
-                    print('Received EOF, quitting.')
-                    self.stop()
-                    continue
-
+                cmd = self._buildToolbarAndGetCmd()
                 if cmd is None:
                     continue
 
-                # Expand !<histIdx>
-                try:
-                    historyExpandedCmd = self.expandHistoryCommand(cmd)
-                except (ValueError, IndexError) as e:
-                    print(f'Error during history expansion: {e}')
-                    continue
-
-                # Expand variable substitution
-                try:
-                    variableExpandedCmd = self.expandVariableCommand(historyExpandedCmd)
-                except KeyError as e:
-                    print(f'Error during variable expansion: {e}')
-                    continue
-                finally:
-                    # add to the history either way.
-                    self.addToHistory(historyExpandedCmd)
-
                 # resolve escaped ! and $.
-                if cmd != variableExpandedCmd:
-                    print(f'Expanded: {variableExpandedCmd}')
+                expandedCmd = self._expandCommand(cmd)
+                # abort if error
+                if expandedCmd is None:
+                    continue
 
                 # Handle the command
-                cmdReturn = self.runCommand(variableExpandedCmd)
+                cmdReturn = self.runCommand(expandedCmd)
                 if cmdReturn != 0:
                     print(f'Error: {cmdReturn}')
             # pylint: disable=broad-except
@@ -257,7 +273,8 @@ class Application():
             raise KeyError(f'There already is a proxy with the name {proxyName}.')
 
         # Create proxy and default parser
-        proxy = Proxy(self._args.bind, remoteHost, localPort, remotePort, proxyName, self.packetHandler, self.outputHandlerPlain)
+        proxy = Proxy(self._args.bind, remoteHost, localPort, remotePort,
+                      proxyName, self.packetHandler, self.outputHandlerPlain)
         parser = ParserContainer(self.DEFAULT_PARSER_MODULE, self)
 
         # Add them to their dictionaries
@@ -359,7 +376,8 @@ class Application():
         # Expand history substitution
         for idx, word in enumerate(words):
             if word.startswith('!'):
-                histIdx = int(word[1:]) # Let it throw ValueError to notify user.
+                # Let it throw ValueError to notify user.
+                histIdx = int(word[1:])
                 if not 0 <= histIdx < len(self._sess.history.get_strings()):
                     raise IndexError(f'History index {histIdx} is out of range.')
 
@@ -379,7 +397,8 @@ class Application():
             for idx, word in enumerate(words):
                 if word.startswith('$'):
                     varname = word[1:]
-                    words[idx] = self._variables[varname] # Let it throw KeyError to notify user.
+                    # Let it throw KeyError to notify user.
+                    words[idx] = self._variables[varname]
         except KeyError as e:
             raise KeyError(f'Variable {word} does not exist: {e}') from e
 
@@ -440,7 +459,6 @@ class Application():
         sys.stdout.flush()
         return
 
-
     def outputHandlerFancy(self, output: list[str]) -> typing.NoReturn:
         # Don't print a new prompt if there is no output
         if output is None or len(output) == 0:
@@ -460,7 +478,8 @@ class Application():
             history = pt.history.FileHistory(filename=self._HISTORY_FILE)
         except (OSError, PermissionError, IsADirectoryError, IOError) as e:
             print(f'Error while trying to open history: {e}')
-            self._HISTORY_FILE = None # This is done to prevent messing with the file after there has been an error with it.
+            # This is done to prevent messing with the file after there has been an error with it.
+            self._HISTORY_FILE = None
             history = pt.history.InMemoryHistory()
         self._sess: pt.PromptSession = pt.PromptSession(history=history)
 
@@ -479,10 +498,10 @@ class Application():
         return
 
     def escapeHTML(self, s: str) -> str:
-        return s.replace('&', '&amp;').replace('<', '&lt;').replace('>','&gt;')
+        return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
 
 # Run
 if __name__ == '__main__':
     application = Application()
     application.main()
-
