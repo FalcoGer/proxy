@@ -1094,6 +1094,26 @@ class Parser():
             print(f'Unable to format helptext {repr(helpText)}: {e}')
             return helpText
 
+    def _simpleEscape(self, nextByte: bytes) -> bytes:
+        ret = b''
+        if nextByte == b'\\':
+            ret = b'\\'
+        elif nextByte == b'n':
+            ret = b'\n'
+        elif nextByte == b'r':
+            ret = b'\r'
+        elif nextByte == b't':
+            ret = b'\t'
+        elif nextByte == b'b':
+            ret = b'\b'
+        elif nextByte == b'f':
+            ret = b'\f'
+        elif nextByte == b'v':
+            ret = b'\v'
+        elif nextByte == b'0':
+            ret = b'\0'
+        return ret
+
     # replaces escape sequences with the proper values
     def _escape(self, data: bytes) -> bytes:
         idx = 0
@@ -1103,22 +1123,9 @@ class Parser():
             if b == b'\\':
                 idx += 1  # Add one to the index so we don't read the escape sequence byte as a normal byte.
                 nextByte = self._intToByte(data[idx])  # May throw IndexError, pass it up to the user.
-                if nextByte == b'\\':
-                    newData += b'\\'
-                elif nextByte == b'n':
-                    newData += b'\n'
-                elif nextByte == b'r':
-                    newData += b'\r'
-                elif nextByte == b't':
-                    newData += b'\t'
-                elif nextByte == b'b':
-                    newData += b'\b'
-                elif nextByte == b'f':
-                    newData += b'\f'
-                elif nextByte == b'v':
-                    newData += b'\v'
-                elif nextByte == b'0':
-                    newData += b'\0'
+                appendedByte = self._simpleEscape(nextByte)
+                if appendedByte != b'':
+                    newData += appendedByte
                 elif nextByte == b'x':
                     newData += bytes.fromhex(data[idx + 1:idx + 3].decode())
                     idx += 2  # skip 2 more bytes.
