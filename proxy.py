@@ -19,7 +19,7 @@ from enum_socket_role import ESocketRole
 try:
     import setproctitle
     _SETPROCTITLE_AVAILABLE = True
-    _PROCTITLE_MAX_CHARS = 15 # Maximum length of a process title is 15 Bytes.
+    _PROCTITLE_MAX_CHARS = 15  # Maximum length of a process title is 15 Bytes.
 except ImportError:
     _SETPROCTITLE_AVAILABLE = False
 
@@ -27,11 +27,13 @@ if typing.TYPE_CHECKING:
     PHType = typing.Callable[[bytes, 'Proxy', ESocketRole], typing.NoReturn]
     OHType = typing.Callable[[list[str], typing.NoReturn]]
 
+
 class Proxy(Thread):
-    def __init__(self, bindAddr: str, remoteAddr: str, localPort: int, remotePort: int, name: str, packetHandler: PHType, outputHandler: OHType):
+    def __init__(self, bindAddr: str, remoteAddr: str, localPort: int, remotePort: int,
+                 name: str, packetHandler: PHType, outputHandler: OHType):
         super().__init__(name=name)
 
-        self.BIND_SOCKET_TIMEOUT = 3.0 # in seconds
+        self.BIND_SOCKET_TIMEOUT = 3.0  # in seconds
 
         self._packetHandler = packetHandler
         self._outputHandler = outputHandler
@@ -109,15 +111,15 @@ class Proxy(Thread):
             finally:
                 self._outputHandler(output)
         # Shutdown
-        if not self._bindSocket is None:
+        if self._bindSocket is not None:
             self._bindSocket.close()
 
-        if not self._client is None:
+        if self._client is not None:
             self._client.stop()
             self._client.join()
             self._client = None
 
-        if not self._server is None:
+        if self._server is not None:
             self._server.stop()
             self._server.join()
             self._server = None
@@ -222,9 +224,11 @@ class Proxy(Thread):
 
 ###############################################################################
 
+
 # This class owns a socket, receives all it's data and accepts data into a queue to be sent to that socket.
 class SocketHandler(Thread):
-    def __init__(self, sock: socket.socket, role: ESocketRole, proxy: Proxy, outputHandler: OHType, packetHandler: PHType, readBufferSize: int = 0xFFFF):
+    def __init__(self, sock: socket.socket, role: ESocketRole, proxy: Proxy,
+                 outputHandler: OHType, packetHandler: PHType, readBufferSize: int = 0xFFFF):
 
         self._sock = sock                # The socket
         self._ROLE = role                # Either client or server
@@ -302,43 +306,22 @@ class SocketHandler(Thread):
         # run until stop() is called.
         while localRunning:
             output = []
+            data = False
+            abort = False
 
             # Update thread title
             if _SETPROCTITLE_AVAILABLE and setproctitle.getthreadtitle() != self._getName()[:_PROCTITLE_MAX_CHARS]:
                 setproctitle.setthreadtitle(self._getName()[:_PROCTITLE_MAX_CHARS])
 
-            try: # Try-Finally block for output.
-                # Receive data from the host.
-                data = False
-                abort = False
-
+            try:  # Try-Finally block for output.
                 readyToRead, readyToWrite, _ = self._getSocketStatus()
 
+                # Receive data from the host.
                 if readyToRead:
-                    # pylint: disable=broad-except
-                    try:
-                        data = self._sock.recv(self._READ_BUFFER_SIZE)
-                        if len(data) == 0:
-                            raise IOError('Socket Disconnected')
-                    except BlockingIOError:
-                        # No data was available at the time.
-                        pass
-                    except Exception as e:
-                        output.append(f'[EXCEPT] - recv data from {self}: {e}')
-                        abort = True
-
-                # If we got data, parse it.
-                if data:
-                    try:
-                        self._packetHandler(data, self._proxy, self._ROLE)
-                    # pylint: disable=broad-except
-                    except Exception as e:
-                        output.extend([f'[EXCEPT] - parse data from {self}: {e}', traceback.format_exc()])
-                        self._proxy.disconnect()
+                    data, abort = self._recvData(output)
 
                 # Send the queue
                 queueEmpty = self._dataQueue.empty()
-                readyToRead, readyToWrite, _ = self._getSocketStatus()
                 abort2 = False
                 if not queueEmpty and readyToWrite:
                     abort2 = self._sendQueue(output)
@@ -347,7 +330,7 @@ class SocketHandler(Thread):
                     self._proxy.disconnect()
 
                 # Prevent the CPU from Melting
-                # Sleep if we didn't get any data or if we didn't send
+                # Sleep if we didn't get any data and if we don't have anything to send or can't send
                 if not data and (queueEmpty or not readyToWrite):
                     sleep(0.001)
 
@@ -369,3 +352,28 @@ class SocketHandler(Thread):
             self._outputHandler(output)
         return
 
+    def _recvData(self, output: list[str]) -> bool:
+        data = False
+        abort = False
+
+        # pylint: disable=broad-except
+        try:
+            data = self._sock.recv(self._READ_BUFFER_SIZE)
+            if len(data) == 0:
+                raise IOError('Socket Disconnected')
+        except BlockingIOError:
+            # No data was available at the time.
+            pass
+        except Exception as e:
+            output.append(f'[EXCEPT] - recv data from {self}: {e}')
+            abort = True
+
+        # If we got data, parse it.
+        if data:
+            try:
+                self._packetHandler(data, self._proxy, self._ROLE)
+            # pylint: disable=broad-except
+            except Exception as e:
+                output.extend([f'[EXCEPT] - parse data from {self}: {e}', traceback.format_exc()])
+                self._proxy.disconnect()
+        return data, abort

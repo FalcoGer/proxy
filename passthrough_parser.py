@@ -14,6 +14,7 @@ if typing.TYPE_CHECKING:
     from application import Application
     from enum import Enum
 
+
 class Parser(base_parser.Parser):
 
     # Define the parser name here as it should appear in the prompt
@@ -33,4 +34,3 @@ class Parser(base_parser.Parser):
     def __init__(self, application: Application, settings: dict[Enum, typing.Any]):
         super().__init__(application, settings)
         return
-

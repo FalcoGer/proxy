@@ -23,7 +23,7 @@ class BufferStatus():
         #                              ^ begin
         #                                   ^ end
         # This is the whole word that is being considered for completion
-        self.being_completed    = self.origline[self.begin : self.end]
+        self.being_completed    = self.origline[self.begin: self.end]
         # being_completed = 'wordth'
         self.words              = self.origline.split(' ')
 
@@ -55,4 +55,3 @@ class BufferStatus():
             if self.origline[idx] == ' ':
                 wordIdx += 1
         return wordIdx
-

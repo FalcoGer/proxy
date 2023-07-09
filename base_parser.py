@@ -30,6 +30,7 @@ if typing.TYPE_CHECKING:
 ###############################################################################
 # Define which settings are available here.
 
+
 class EBaseSettingKey(Enum):
     HEXDUMP_ENABLED             = auto()
     HEXDUMP                     = auto()
@@ -57,6 +58,7 @@ class EBaseSettingKey(Enum):
     def __hash__(self):
         return self.value.__hash__()
 
+
 class Parser(core_parser.Parser):
     def __init__(self, application: Application, settings: dict[(Enum, typing.Any)]):
         super().__init__(application, settings)
@@ -75,11 +77,11 @@ class Parser(core_parser.Parser):
     # Define the defaults for each setting here.
     def getDefaultSettings(self) -> dict[(Enum, typing.Any)]:
         defaultSettings = {
-                EBaseSettingKey.HEXDUMP_ENABLED: True,
-                EBaseSettingKey.HEXDUMP: Hexdump(),
-                EBaseSettingKey.PACKETNOTIFICATION_ENABLED: True,
-                EBaseSettingKey.PACKET_NUMBER: -1
-            }
+            EBaseSettingKey.HEXDUMP_ENABLED: True,
+            EBaseSettingKey.HEXDUMP: Hexdump(),
+            EBaseSettingKey.PACKETNOTIFICATION_ENABLED: True,
+            EBaseSettingKey.PACKET_NUMBER: -1
+        }
         # Return the base class defaults as well
         return super().getDefaultSettings() | defaultSettings
 
@@ -103,7 +105,7 @@ class Parser(core_parser.Parser):
 
             pktNrStr = f'[PKT# {pktNr}]'
 
-            directionStr =  '[C -> S]' if origin == ESocketRole.CLIENT else '[C <- S]'
+            directionStr = '[C -> S]' if origin == ESocketRole.CLIENT else '[C <- S]'
 
             dataLenStr = f'{len(data)} Byte{"s" if len(data) > 1 else ""}'
 
@@ -151,23 +153,47 @@ class Parser(core_parser.Parser):
     # Define which commands are available here and which function is called when it is entered by the user.
     # Return a dictionary with the command as the key and a tuple of (function, str, completerArray) as the value.
     # The function is called when the command is executed, the string is the help text for that command.
-    # The last completer in the completer array will be used for all words if the word index is higher than the index in the completer array.
+    # The last completer in the completer array will be
+    # used for all words if the word index is higher than the index in the completer array.
     # If you don't want to provide more completions, use None at the end.
     def _buildCommandDict(self) -> CommandDictType:
         ret = super()._buildCommandDict()
 
         sendHexNote = 'Usage: {0} <HexData> \nExample: {0} 41424344\nNote: Spaces in hex data are allowed and ignored.'
-        sendStringNote = 'Usage: {0} <String>\nExample: {0} hello\\!\\n\nNote: Leading spaces in the string are sent\nexcept for the space between the command and\nthe first character of the string.\nEscape sequences are available.'
+        sendStringNote = 'Usage: {0} <String>\n' \
+                         'Example: {0} hello\\!\n\n' \
+                         'Note: Leading spaces in the string are sent except for the space between the command and\n' \
+                         'the first character of the string.\n' \
+                         'Escape sequences are available.'
         sendFileNote = 'Usage: {0} filename\nExample: {0} /home/user/.bashrc'
 
-        ret['hexdump']      = (self._cmd_hexdump, 'Configure the hexdump or show current configuration.\nUsage: {0} [yes|no] [<BytesPerLine>] [<BytesPerGroup>]', [self._yesNoCompleter, None, ])
-        ret['notify']       = (self._cmd_notify, 'Configure packet notifications.\nUsage: {0} [yes|no]\nIf argument omitted, this will toggle the notifications.', [self._yesNoCompleter, None])
+        ret['hexdump']      = (
+            self._cmd_hexdump,
+            'Configure the hexdump or show current configuration.\n'
+            'Usage: {0} [yes|no] [<BytesPerLine>] [<BytesPerGroup>]',
+            [self._yesNoCompleter, None, ]
+        )
+        ret['notify']       = (
+            self._cmd_notify,
+            'Configure packet notifications.\n'
+            'Usage: {0} [yes|no]\n'
+            'If argument omitted, this will toggle the notifications.',
+            [self._yesNoCompleter, None]
+        )
         ret['h2s']          = (self._cmd_h2s, f'Send arbitrary hex values to the server.\n{sendHexNote}', None)
         ret['s2s']          = (self._cmd_s2s, f'Send arbitrary strings to the server.\n{sendStringNote}', None)
-        ret['f2s']          = (self._cmd_f2s, f'Send arbitrary files to the server.\n{sendFileNote}', [self._fileCompleter, None])
+        ret['f2s']          = (
+            self._cmd_f2s,
+            f'Send arbitrary files to the server.\n{sendFileNote}',
+            [self._fileCompleter, None]
+        )
         ret['h2c']          = (self._cmd_h2c, f'Send arbitrary hex values to the client.\n{sendHexNote}', None)
         ret['s2c']          = (self._cmd_s2c, f'Send arbitrary strings to the client.\n{sendStringNote}', None)
-        ret['f2c']          = (self._cmd_f2c, f'Send arbitrary files to the client.\n{sendFileNote}', [self._fileCompleter, None])
+        ret['f2c']          = (
+            self._cmd_f2c,
+            f'Send arbitrary files to the client.\n{sendFileNote}',
+            [self._fileCompleter, None]
+        )
 
         return ret
 

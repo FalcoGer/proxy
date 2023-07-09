@@ -12,6 +12,7 @@ if typing.TYPE_CHECKING:
     from core_parser import Parser, CommandDictType
     from prompt_toolkit.document import Document
 
+
 class CustomCompleter(Completer):
     def __init__(self, application: Application, parser: Parser):
         self.application = application
@@ -32,49 +33,18 @@ class CustomCompleter(Completer):
             if bufferStatus.begin > 0:
                 prevChar = document.current_line[bufferStatus.begin - 1]
 
-            if bufferStatus.being_completed.startswith('!'):
-                # completing history substitution
-                self.getHistIdxCandidates(True, document)
-            elif prevChar == '!':
-                # completing history substitution
-                self.getHistIdxCandidates(False, document)
-            elif bufferStatus.being_completed.startswith('$'):
-                # completing variable
-                self.getVariableCandidates(True, bufferStatus)
+            if self._completeBuiltin(bufferStatus, document, prevChar):
+                # completing variables and history
+                pass
             elif bufferStatus.wordIdx == 0:
                 # Completing commands
                 for cmd in cmdDict:
                     if cmd.startswith(bufferStatus.being_completed):
                         self.candidates.append(cmd)
             else:
-                # Completing command argument
-                if bufferStatus.words[0] not in cmdDict.keys():
-                    # Can't complete if command is invalid
+                hasNothing = self._completeCommandArgument(bufferStatus, cmdDict)
+                if hasNothing:
                     return None
-
-                # retrieve which completer functions are available
-                _, _, completerFunctionArray = cmdDict[bufferStatus.words[0]]
-
-                if completerFunctionArray is None or len(completerFunctionArray) == 0:
-                    # Can't complete if there is no completer function defined
-                    # For example for commands without arguments
-                    return None
-
-                if bufferStatus.wordIdx - 1 < len(completerFunctionArray):
-                    # Use the completer function with the index of the current word.
-                    # -1 for the command itself.
-                    completerFunction = completerFunctionArray[bufferStatus.wordIdx - 1]
-                else:
-                    # Last completer will be used if currently completed word index is higher than
-                    # the amount of completer functions defined for that command
-                    completerFunction = completerFunctionArray[-1]
-
-                # Don't complete anything if there is no such function defined.
-                if completerFunction is None:
-                    return None
-
-                # Get candidates.
-                completerFunction(bufferStatus)
 
             # Return the answer!
             try:
@@ -96,6 +66,52 @@ class CustomCompleter(Completer):
             print(traceback.format_exc())
 
         return None
+
+    def _completeBuiltin(self, bufferStatus: BufferStatus, document: Document, prevChar: str) -> bool:
+        if bufferStatus.being_completed.startswith('!'):
+            # completing history substitution
+            self.getHistIdxCandidates(True, document)
+            return True
+        if prevChar == '!':
+            # completing history substitution
+            self.getHistIdxCandidates(False, document)
+            return True
+        if bufferStatus.being_completed.startswith('$'):
+            # completing variable
+            self.getVariableCandidates(True, bufferStatus)
+            return True
+        return False
+
+    def _completeCommandArgument(self, bufferStatus: BufferStatus, cmdDict: CommandDictType) -> bool:
+        # Completing command argument
+        if bufferStatus.words[0] not in cmdDict.keys():
+            # Can't complete if command is invalid
+            return True
+
+        # retrieve which completer functions are available
+        _, _, completerFunctionArray = cmdDict[bufferStatus.words[0]]
+
+        if completerFunctionArray is None or len(completerFunctionArray) == 0:
+            # Can't complete if there is no completer function defined
+            # For example for commands without arguments
+            return True
+
+        if bufferStatus.wordIdx - 1 < len(completerFunctionArray):
+            # Use the completer function with the index of the current word.
+            # -1 for the command itself.
+            completerFunction = completerFunctionArray[bufferStatus.wordIdx - 1]
+        else:
+            # Last completer will be used if currently completed word index is higher than
+            # the amount of completer functions defined for that command
+            completerFunction = completerFunctionArray[-1]
+
+        # Don't complete anything if there is no such function defined.
+        if completerFunction is None:
+            return True
+
+        # Get candidates.
+        completerFunction(bufferStatus)
+        return False
 
     def getHistIdxCandidates(self, includePrefix: bool, document: Document) -> typing.NoReturn:
         # Complete possible values only if there is not a complete match.
@@ -143,5 +159,3 @@ class CustomCompleter(Completer):
             if (('$' if includePrefix else '') + variableName).startswith(bufferStatus.being_completed):
                 self.candidates.append(('$' if includePrefix else '') + variableName)
         return
-
-

@@ -41,11 +41,13 @@ class Application():
 
         # parse command line arguments.
         arg_parser = argparse.ArgumentParser(
-            description='Create multiple proxy connections. Provide multiple proxy parameters to create multiple proxies.')
+            description='Create multiple proxy connections. '
+                        'Provide multiple proxy parameters to create multiple proxies.')
         arg_parser.add_argument('-b', '--bind', metavar=('binding_address'), required=False,
                                 help='Bind IP-address for the listening socket. Default \'0.0.0.0\'', default='0.0.0.0')
         arg_parser.add_argument('-p', '--proxy', nargs=3, metavar=('lp', 'rp', 'host'), action='append', required=False,
-                                help='Local port to listen on as well as the remote port and host ip address or hostname for the proxy to connect to.')
+                                help='Local port to listen on as well as the remote '
+                                     'port and host ip address or hostname for the proxy to connect to.')
 
         self._args = arg_parser.parse_args()
 

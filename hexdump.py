@@ -3,12 +3,15 @@ from __future__ import annotations
 from enum import Enum, auto
 import typing
 
+
 class ERepresentation(Enum):
     HEX = auto()
     PRINTABLE = auto()
 
+
 class ColorSetting:
-    def __init__(self, hexTagsOdd: str = None, hexTagsEven: str = None, printableTagsOdd: str = None, printableTagsEven: str = None):
+    def __init__(self, hexTagsOdd: str = None, hexTagsEven: str = None,
+                 printableTagsOdd: str = None, printableTagsEven: str = None):
         if hexTagsOdd is None:
             hexTagsOdd = ''
         self._hexTagsOdd = (hexTagsOdd, self._getClosingTags(hexTagsOdd))
@@ -45,13 +48,14 @@ class ColorSetting:
                 tagStart = 0
                 tagEnd = -1
                 tag = tagContent.split()[0]
-                closingTags.insert(0,f'</{tag}>')
+                closingTags.insert(0, f'</{tag}>')
         return ''.join(closingTags)
 
     def __str__(self):
         return f'ColorSetting: {self._hexAttributes=}, {self._printableAttributes=}'
 
-    def colorize(self, dataStr: str, isEven: bool = False, representation: ERepresentation = ERepresentation.HEX) -> str:
+    def colorize(self, dataStr: str, isEven: bool = False,
+                 representation: ERepresentation = ERepresentation.HEX) -> str:
         attr = None
         if representation == ERepresentation.HEX:
             if self._hexAttributes is not None:
@@ -68,8 +72,9 @@ class ColorSetting:
                     # odd or not enough attributes in the tuple (only gave the odd one)
                     attr = self._printableAttributes[0]
 
-        dataStr = dataStr.replace('&', '&amp;').replace('<', '&lt;').replace('>','&gt;')
+        dataStr = dataStr.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
         return f'{attr[0]}{dataStr}{attr[1]}'
+
 
 class EColorSettingKey(Enum):
     # For formatting:
@@ -109,7 +114,8 @@ class EColorSettingKey(Enum):
 
 
 class Hexdump():
-    def __init__(self, bytesPerLine: int = 16, bytesPerGroup: int = 4, printHighAscii: bool = False, defaultColors: bool = True):
+    def __init__(self, bytesPerLine: int = 16, bytesPerGroup: int = 4,
+                 printHighAscii: bool = False, defaultColors: bool = True):
         self.setBytesPerLine(bytesPerLine)
         self.setBytesPerGroup(bytesPerGroup)
         self.setSep('.')
@@ -119,7 +125,9 @@ class Hexdump():
         # otherwise the representation would be something like "'\xff'" (len 6).
         # So this creates a list of character representations for every possible byte value.
         # Special case is the backslash since it's representation string is "'\\\\'" (len 6)
-        self.REPRESENTATION_ARRAY = ''.join([(len(repr(chr(b))) == 3 or repr(chr(b)) == '\'\\\\\'') and chr(b) or self.sep for b in range(256)])
+        self.REPRESENTATION_ARRAY = ''.join(
+            [(len(repr(chr(b))) == 3 or repr(chr(b)) == '\'\\\\\'') and chr(b) or self.sep for b in range(256)]
+        )
 
         self.colorSettings: dict[(typing.Union[EColorSettingKey, int], ColorSetting)] = {}
 
@@ -133,17 +141,19 @@ class Hexdump():
             # Data
             self.colorSettings[EColorSettingKey.CONTROL]                = ColorSetting('<violet>', '<magenta>')
             self.colorSettings[EColorSettingKey.DIGITS]                 = ColorSetting('<turquoise>', '<teal>')
-            self.colorSettings[EColorSettingKey.LETTERS]                = ColorSetting('<lime>','<green>')
-            self.colorSettings[EColorSettingKey.PRINTABLE]              = ColorSetting('<cyan>','<darkcyan>')
-            self.colorSettings[EColorSettingKey.PRINTABLE_HIGH_ASCII]   = ColorSetting('<yellow>','<orange>')
-            self.colorSettings[EColorSettingKey.NON_PRINTABLE]          = ColorSetting('<red>','<darkred>')
-            self.colorSettings[ord(' ')]                                = ColorSetting('<lime>','<green>','<lime><u>','<green><u>')
-            self.colorSettings[ord('_')]                                = ColorSetting('<cyan>','<darkcyan>','<cyan><u><b>','<darkcyan><u><b>')
-            self.colorSettings[0x00]                                    = ColorSetting('<white><b>','<lightgray><b>')
+            self.colorSettings[EColorSettingKey.LETTERS]                = ColorSetting('<lime>', '<green>')
+            self.colorSettings[EColorSettingKey.PRINTABLE]              = ColorSetting('<cyan>', '<darkcyan>')
+            self.colorSettings[EColorSettingKey.PRINTABLE_HIGH_ASCII]   = ColorSetting('<yellow>', '<orange>')
+            self.colorSettings[EColorSettingKey.NON_PRINTABLE]          = ColorSetting('<red>', '<darkred>')
+            # Single Bytes
+            self.colorSettings[ord(' ')]    = ColorSetting('<lime>', '<green>', '<lime><u>', '<green><u>')
+            self.colorSettings[ord('_')]    = ColorSetting('<cyan>', '<darkcyan>', '<cyan><u><b>', '<darkcyan><u><b>')
+            self.colorSettings[0x00]        = ColorSetting('<white><b>', '<lightgray><b>')
         return
 
     def __str__(self):
-        return f'Grouping {self.bytesPerLine}/{self.bytesPerGroup}, PrintHighAscii: {self.printHighAscii}, Sep: {repr(self.sep)}. {len(self.colorSettings)} Colors defined.'
+        return f'Grouping {self.bytesPerLine}/{self.bytesPerGroup}, PrintHighAscii: {self.printHighAscii}, ' \
+               f'Sep: {repr(self.sep)}. {len(self.colorSettings)} Colors defined.'
 
     def setBytesPerLine(self, bytesPerLine: int = 16) -> typing.NoReturn:
         if not isinstance(bytesPerLine, int):
@@ -187,7 +197,7 @@ class Hexdump():
         return
 
     def unsetColorSetting(self, key: typing.Union[EColorSettingKey, int]) -> typing.NoReturn:
-        if not isinstance(key,  EColorSettingKey) and not isinstance(key, int):
+        if not isinstance(key, EColorSettingKey) and not isinstance(key, int):
             raise TypeError(f'Key must be of type {repr(EColorSettingKey)} or {repr(int)}')
         if isinstance(key, int) and not 0x00 >= key >= 0xFF:
             raise ValueError(f'Key must be within the range of bytes [0x00 .. 0xFF] but was {key:X}')
@@ -206,7 +216,7 @@ class Hexdump():
 
         for addr in range(0, len(src), self.bytesPerLine):
             # The chars we need to process for this line
-            byteArray = src[addr : addr + self.bytesPerLine]
+            byteArray = src[addr:addr + self.bytesPerLine]
             lines.append(self.constructLine(addr, maxAddrLen, byteArray))
         lines.append(self.constructByteTotal(len(src), maxAddrLen))
         return lines
@@ -351,4 +361,3 @@ class Hexdump():
 
         requiredPaddingLength = normalLength - actualLength
         return requiredPaddingLength
-

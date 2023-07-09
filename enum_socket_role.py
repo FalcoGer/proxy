@@ -1,6 +1,7 @@
 from enum import Enum, auto
 import typing
 
+
 class ESocketRole(Enum):
     SERVER = auto()
     CLIENT = auto()
@@ -25,4 +26,3 @@ class ESocketRole(Enum):
 
     def __hash__(self):
         return hash(self.value)
-

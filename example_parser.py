@@ -31,17 +31,17 @@ from enum import Enum, auto
 # pylint: disable=redefined-builtin
 from prompt_toolkit import print_formatted_text as print
 # pylint: enable=redefined-builtin
-from prompt_toolkit.formatted_text import HTML, to_formatted_text
+# from prompt_toolkit.formatted_text import HTML, to_formatted_text
 
 # struct is used to decode bytes into primitive data types
 # https://docs.python.org/3/library/struct.html
-import struct
+# import struct
 
 # Allows pretty printing of bytes in a hexdump format
 # One such class instance is available in the base parser settings.
 # But you might want to make your own
 # instance for your custom configuration
-from hexdump import Hexdump
+# from hexdump import Hexdump
 
 # This is the base class for the custom parser class
 import base_parser
@@ -60,6 +60,7 @@ if typing.TYPE_CHECKING:
 
 ###############################################################################
 # Create keys for settings that should have a default value here.
+
 
 class ESettingKey(Enum):
     EXAMPLE_SETTING = auto()
@@ -85,6 +86,7 @@ class ESettingKey(Enum):
     def __hash__(self):
         return self.value.__hash__()
 
+
 # Class name must be Parser
 class Parser(base_parser.Parser):
 
@@ -95,8 +97,8 @@ class Parser(base_parser.Parser):
     # Use this to set sensible defaults for your stored variables.
     def getDefaultSettings(self) -> dict[(Enum, typing.Any)]:
         userDefaultSettings = {
-                ESettingKey.EXAMPLE_SETTING: 'ExAmPlE'
-            }
+            ESettingKey.EXAMPLE_SETTING: 'ExAmPlE'
+        }
 
         # Make sure to include the base class settings as well.
         defaultSettings = super().getDefaultSettings()
@@ -138,13 +140,17 @@ class Parser(base_parser.Parser):
     # Define which commands are available here and which function is called when it is entered by the user.
     # Return a dictionary with the command as the key and a tuple of (function, str, completerArray) as the value.
     # The function is called when the command is executed, the string is the help text for that command.
-    # The last completer in the completer array will be used for all words if the word index is higher than the index in the completer array.
+    # The last completer in the completer array will be used for all words if
+    # the word index is higher than the index in the completer array.
     # If you don't want to provide more completions, use None at the end.
     def _buildCommandDict(self) -> CommandDictType:
         ret = super()._buildCommandDict()
 
         # Add your custom commands here
-        ret['example']      = (self._cmd_example, 'Sends the string in the example setting count times to the client.\nUsage: {0} [upper | lower | as_is] <count>\nExample {0} as_is 10.', [self._exampleCompleter, None])
+        ret['example']      = (
+            self._cmd_example,
+            'Sends the string in the example setting count times to the client.\n'
+            'Usage: {0} [upper | lower | as_is] <count>\nExample {0} as_is 10.', [self._exampleCompleter, None])
         # Alises
         ret['ex']           = ret['example']
         return ret
@@ -174,7 +180,7 @@ class Parser(base_parser.Parser):
             print(self.getHelpText(args[0]))
             return f'Capitalize must be "upper", "lower" or "as_is", but was {args[1]}'
 
-        count = self._strToInt(args[2]) # this allows hex, bin and oct notations also
+        count = self._strToInt(args[2])  # this allows hex, bin and oct notations also
         data = dataStr.encode('utf-8')
 
         # xmit count times

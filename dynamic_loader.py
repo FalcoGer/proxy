@@ -7,7 +7,7 @@ import importlib.util
 import hashlib
 import typing
 
-from types import ModuleType # Needs to be outside of typing.TYPE_CHECKING for some reason.
+from types import ModuleType  # Needs to be outside of typing.TYPE_CHECKING for some reason.
 if typing.TYPE_CHECKING:
     pass
 
@@ -61,4 +61,3 @@ class DynamicLoader:
             while buf := file.read(BUFF_SIZE):
                 hashFunction.update(buf)
             return hashFunction.digest()
-

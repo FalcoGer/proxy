@@ -11,7 +11,6 @@ if typing.TYPE_CHECKING:
 
 # This class holds parser items imported from module name.
 # When the parser is requested from this class, it will be reloaded if required
-
 class ParserContainer():
     def __init__(self, moduleName: str, application: Application):
         self.application = application
@@ -50,4 +49,3 @@ class ParserContainer():
                 self.application.setCompleter(self.instance.completer)
 
         return self.instance
-
