@@ -53,6 +53,9 @@ class Proxy(Thread):
 
         self._bind(self._bindAddr, self._localPort)
 
+        # Lock for other thread calling this thread's functions
+        self._lock = Lock()
+
         return
 
     def __str__(self) -> str:
@@ -86,28 +89,28 @@ class Proxy(Thread):
                 newClientHasConnected = self._waitForClient()
                 if not newClientHasConnected:
                     continue
+                with self._lock:
+                    # Client has connected.
+                    ch, cp = self.getClient()
+                    output.append(f'[{self}]: Client connected: {ch}:{cp}')
 
-                # Client has connected.
-                ch, cp = self.getClient()
-                output.append(f'[{self}]: Client connected: {ch}:{cp}')
+                    # Connect to the remote host after a client has connected.
+                    output.append(f'[{self}]: Connecting to {self._remoteAddr}:{self._remotePort}')
+                    if not self._connect():
+                        output.append(f'[{self}]: Could not connect to remote host.')
+                        self._client.start()
+                        self._client.stop()
+                        self._client.join()
+                        self._client = None
+                        continue
 
-                # Connect to the remote host after a client has connected.
-                output.append(f'[{self}]: Connecting to {self._remoteAddr}:{self._remotePort}')
-                if not self._connect():
-                    output.append(f'[{self}]: Could not connect to remote host.')
+                    # Start client and server socket handler threads.
                     self._client.start()
-                    self._client.stop()
-                    self._client.join()
-                    self._client = None
-                    continue
+                    self._server.start()
 
-                # Start client and server socket handler threads.
-                self._client.start()
-                self._server.start()
+                    self._connected = True
 
-                self._connected = True
-
-                output.append(f'[{self}]: Connection established.')
+                    output.append(f'[{self}]: Connection established.')
             finally:
                 self._outputHandler(output)
         # Shutdown
@@ -211,15 +214,16 @@ class Proxy(Thread):
         return self._connected
 
     def disconnect(self) -> typing.NoReturn:
-        if self._client is not None:
-            self._client.stop()
-            self._client = None
+        with self._lock:
+            if self._client is not None:
+                self._client.stop()
+                self._client = None
 
-        if self._server is not None:
-            self._server.stop()
-            self._server = None
+            if self._server is not None:
+                self._server.stop()
+                self._server = None
 
-        self._connected = False
+            self._connected = False
         return
 
 ###############################################################################
