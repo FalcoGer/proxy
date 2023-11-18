@@ -1,4 +1,4 @@
-# This parser simply passes the data through and prints plain text instead of hexdump
+# This parser simply passes the data through and prints formatted json data
 
 from __future__ import annotations
 import typing
@@ -36,6 +36,8 @@ class Parser(base_parser.Parser):
             proxy.sendToClient(data)
         return output
 
+    # Turns a string into an array of strings by carving out json objects
+    # and appending them separately from normal text.
     @staticmethod
     def find_json(string: str) -> list[str]:
         result = [""]
@@ -74,6 +76,7 @@ class Parser(base_parser.Parser):
         # remove all empty ones
         return [item for item in result if item]
 
+    # Takes in the raw data and turns it into a formatted output.
     @staticmethod
     def format_json(byte_array: bytes, use_colors: bool) -> str:
         plainString = PlainTextParser.bytes_to_escaped_string(byte_array)
